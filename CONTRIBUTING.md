@@ -39,7 +39,8 @@ rather than a quick baseline rewrite.
 
 Releases publish to npm automatically, the same way o1js-scan does:
 
-1. Bump the version in `package.json` and update `CHANGELOG.md`, then merge.
+1. Bump the version in `package.json` and update `CHANGELOG.md`, then merge. The CLI and
+   Action both read that version automatically; do not add or update separate version literals.
 2. Cut a GitHub Release for tag `vX.Y.Z`.
 
 Publishing the release runs `.github/workflows/release.yml`, which authenticates with the

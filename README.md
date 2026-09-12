@@ -260,9 +260,10 @@ git SHA and it uses exactly that code. (Installing the checkout directory direct
 not work: npm links it without running `prepack`, so `dist/` is never built and no binary
 is created. The action packs a tarball first.)
 
-The Action pins its default npm package version to the version released with the Action,
-so a tagged workflow cannot silently begin executing a newer package. Set `version`
-explicitly when evaluating another release.
+The Action reads its default npm package version from the `package.json` in the pinned
+Action checkout, so a tagged workflow cannot silently begin executing a newer package
+and a release bump has only one source of truth. Set `version` explicitly when evaluating
+another release.
 
 The Action caches o1js compile artifacts across runs, keyed on the o1js version and the
 lockfile hash, and posts (and updates) a single pull request comment summarizing drift.
