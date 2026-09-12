@@ -30,6 +30,13 @@ updates:
       # dropped deliberately; revisit when Node 20 leaves maintenance.
       - dependency-name: vitest
         update-types: ['version-update:semver-major']
+      # @types/node tracks the MINIMUM supported runtime, not the newest one.
+      # Types for a later Node let code that uses newer APIs typecheck cleanly
+      # and then fail at runtime on Node 20, which is the floor `engines`
+      # promises and CI tests. Raise this together with `engines` and the CI
+      # matrix, never on its own.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /

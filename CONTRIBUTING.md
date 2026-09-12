@@ -64,6 +64,11 @@ pipeline before trusting it with a real release.
 
 ## Node.js support
 
+`@types/node` is pinned to the **minimum** supported runtime (v20), not the newest.
+Types for a later Node would let code that uses newer APIs typecheck cleanly and then
+fail at runtime on Node 20. Raise it together with `engines` and the CI matrix, never on
+its own.
+
 vitest is pinned to v4 on purpose. vitest 5 requires Node >= 22.12, while this project
 supports Node >= 20 and CI tests that floor; npm does not enforce `engines` without
 `engine-strict`, so vitest 5 would install and appear to pass on Node 20 while being

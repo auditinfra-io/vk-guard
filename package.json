@@ -61,7 +61,7 @@
     "typescript": "^5.7.0"
   },
   "devDependencies": {
-    "@types/node": "^26.5.0",
+    "@types/node": "^20.19.9",
     "o1js": "^3.0.0",
     "vitest": "^4.1.11"
   }

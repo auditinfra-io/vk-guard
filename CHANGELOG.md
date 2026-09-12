@@ -14,6 +14,10 @@ All notable changes to this project will be documented here. This project follow
 
 ### Changed
 
+- Pinned `@types/node` to v20, matching the minimum runtime `engines` promises. Types
+  for a later Node let code using newer APIs typecheck cleanly and then fail at runtime
+  on the supported floor. Typecheck passes against the Node 20 types, confirming no
+  post-Node-20 API is relied on.
 - Pinned vitest to v4. vitest 5 requires Node >= 22.12 while this project supports
   Node >= 20 and CI tests that floor; npm does not enforce `engines` without
   `engine-strict`, so vitest 5 installed and appeared to pass on Node 20 despite being
