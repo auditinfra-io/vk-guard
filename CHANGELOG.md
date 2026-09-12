@@ -5,6 +5,24 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Added
+
+- `.github/workflows/release.yml`: tag-driven npm publish via Trusted Publishing (OIDC,
+  no stored token), gated on the full test suite and the example self-check, with tarball
+  content verification, major-tag aliasing and a GitHub release. `workflow_dispatch`
+  provides a dry run.
+
+### Changed
+
+- Pinned `@types/node` to v20, matching the minimum runtime `engines` promises. Types
+  for a later Node let code using newer APIs typecheck cleanly and then fail at runtime
+  on the supported floor. Typecheck passes against the Node 20 types, confirming no
+  post-Node-20 API is relied on.
+- Pinned vitest to v4. vitest 5 requires Node >= 22.12 while this project supports
+  Node >= 20 and CI tests that floor; npm does not enforce `engines` without
+  `engine-strict`, so vitest 5 installed and appeared to pass on Node 20 despite being
+  unsupported there. Dependabot now holds vitest at its current major.
+
 ### Fixed
 
 - Contract and method names that collide with `Object.prototype` members (`toString`,

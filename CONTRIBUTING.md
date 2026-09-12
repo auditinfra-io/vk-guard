@@ -35,6 +35,46 @@ matches the approach o1js itself takes in `tests/vk-regression/`. If it ever fai
 runner but not locally, that is a real finding about o1js determinism and worth an issue
 rather than a quick baseline rewrite.
 
+## Releasing
+
+The first publish has to be done by hand, because npm can only configure Trusted
+Publishing for a package that already exists:
+
+```bash
+npm login
+npm publish --access public   # prepack builds dist/
+```
+
+Then enable Trusted Publishing on npmjs.com (package -> Settings -> Trusted Publisher ->
+GitHub Actions) pointing at this repository and `.github/workflows/release.yml`. Every
+release after that runs through the workflow with **no stored npm token** — GitHub
+supplies a short-lived OIDC credential and npm attaches a provenance attestation.
+
+To cut a release: bump the version in `package.json`, update `CHANGELOG.md`, merge, then
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The workflow refuses to publish if the tag and `package.json` disagree, runs the full
+suite plus `example:check` first, verifies `examples/` and `test/` stayed out of the
+tarball, and moves the major alias (`v0`, later `v1`) that the Action examples pin.
+`workflow_dispatch` runs everything except the publish, which is the way to validate the
+pipeline before trusting it with a real release.
+
+## Node.js support
+
+`@types/node` is pinned to the **minimum** supported runtime (v20), not the newest.
+Types for a later Node would let code that uses newer APIs typecheck cleanly and then
+fail at runtime on Node 20. Raise it together with `engines` and the CI matrix, never on
+its own.
+
+vitest is pinned to v4 on purpose. vitest 5 requires Node >= 22.12, while this project
+supports Node >= 20 and CI tests that floor; npm does not enforce `engines` without
+`engine-strict`, so vitest 5 would install and appear to pass on Node 20 while being
+unsupported there. Dependabot is configured not to offer that major. When Node 20 is
+dropped deliberately, lift the pin, raise `engines`, and update the CI matrix together.
+
 ## Pull requests
 
 - Add tests for observable behavior changes and keep snapshots deterministic.
