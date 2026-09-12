@@ -1,0 +1,151 @@
+# Publishes vk-guard to npm and cuts a GitHub release.
+#
+# FIRST PUBLISH MUST BE MANUAL. npm can only configure Trusted Publishing for a
+# package that already exists, so the very first release has to be pushed by
+# hand to claim the name:
+#
+#   npm login
+#   npm publish --access public      # prepack runs the build
+#
+# After that, configure Trusted Publishing on npmjs.com
+# (package -> Settings -> Trusted Publisher -> GitHub Actions) naming this
+# repository and this workflow file, `release.yml`. Every later release then
+# runs here with no stored npm token: the `id-token: write` permission below
+# lets npm exchange a short-lived OIDC credential instead, and provenance is
+# attested automatically.
+#
+# To release: bump the version in package.json, update CHANGELOG.md, merge,
+# then push a matching tag:
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run every check and pack the tarball, but do not publish.'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release and move the major tag
+      id-token: write # OIDC credential for npm Trusted Publishing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags are needed to move the major alias
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishing needs npm >= 11.5.1; setup-node still ships npm 10.
+      - name: Ensure npm supports Trusted Publishing
+        run: |
+          set -euo pipefail
+          npm install --global npm@latest
+          npm --version
+
+      - run: npm ci
+
+      # A release is the last place to discover a regression, so the full gate
+      # runs here too: types, build, the real-circuit test suite, and the
+      # self-check against examples/counter.
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+        timeout-minutes: 30
+      - run: npm run example:check
+        timeout-minutes: 15
+
+      - name: Check the tag matches package.json
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$PKG" ]; then
+            echo "::error::tag $TAG does not match package.json version $PKG; bump one of them"
+            exit 1
+          fi
+          echo "releasing $PKG"
+          echo "VERSION=$PKG" >> "$GITHUB_ENV"
+
+      - name: Verify the package contents
+        run: |
+          set -euo pipefail
+          npm pack --dry-run
+          # examples/ and test/ must never ship; the bin must.
+          TARBALL="$(npm pack --silent | tail -1)"
+          tar -tzf "$TARBALL" > files.txt
+          grep -q '^package/dist/cli.js$' files.txt || { echo "::error::dist/cli.js missing from the tarball"; exit 1; }
+          if grep -qE '^package/(examples|test)/' files.txt; then
+            echo "::error::examples/ or test/ leaked into the published package"
+            exit 1
+          fi
+          rm -f "$TARBALL" files.txt
+
+      - name: Publish to npm
+        if: github.event_name == 'push'
+        # No NODE_AUTH_TOKEN: Trusted Publishing supplies a short-lived OIDC
+        # credential, and npm attaches a provenance attestation automatically.
+        run: npm publish --access public
+
+      - name: Move the major version tag
+        if: github.event_name == 'push' && !contains(github.ref_name, '-')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # README and action.yml examples reference `auditinfra-io/vk-guard@v1`,
+          # so the major alias has to follow each release.
+          MAJOR="v${TAG#v}"
+          MAJOR="${MAJOR%%.*}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f "$MAJOR" "$GITHUB_SHA"
+          git push origin "refs/tags/$MAJOR" --force
+          echo "moved $MAJOR to $GITHUB_SHA"
+
+      - name: Create the GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          PRERELEASE=''
+          case "$TAG" in *-*) PRERELEASE='--prerelease' ;; esac
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --generate-notes \
+            $PRERELEASE
+
+      - name: Summary
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "### vk-guard release"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "Published \`$TAG\` to npm with provenance."
+            else
+              echo "Dry run: all checks passed, nothing published."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

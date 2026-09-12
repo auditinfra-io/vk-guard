@@ -259,8 +259,9 @@ jobs:
           source: action
 ```
 
-Once the package is published, drop the `source` input and pin a release tag
-(`auditinfra-io/vk-guard@v1`) instead.
+Once the package is published, drop the `source` input and pin the major-version
+tag instead — `auditinfra-io/vk-guard@v0` while the tool is pre-1.0, `@v1` after that.
+The release workflow moves that alias on every release.
 
 Inputs: `working-directory`, `entry`, `rows-only`, `cache-dir`, `snapshot`,
 `node-version`, `version`, `source`, `install`, `install-command`, `cache`,

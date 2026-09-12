@@ -23,6 +23,13 @@ updates:
       # arrive as an automated PR.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
+      # vitest 5 requires Node >= 22.12, but this project supports Node >= 20
+      # and CI tests that floor. npm does not enforce `engines` without
+      # engine-strict, so vitest 5 installs and appears to pass on Node 20
+      # while being unsupported there. Held at v4 until the Node 20 floor is
+      # dropped deliberately; revisit when Node 20 leaves maintenance.
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
