@@ -31,3 +31,11 @@ jobs:
           npm pack --dry-run
           test -f dist/cli.js
           test -f dist/index.js
+
+      # vk-guard guards itself. examples/counter holds a real zkApp (a
+      # SmartContract and a ZkProgram) with its verification keys and row
+      # counts committed alongside it. If an o1js upgrade or a change in this
+      # repo moves either, this step is what says so.
+      - name: Dogfood - check the example project
+        run: npm run example:check
+        timeout-minutes: 15

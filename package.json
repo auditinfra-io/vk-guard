@@ -49,7 +49,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm test",
     "pretest": "npm run build",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "example:check": "node dist/cli.js check --root examples/counter --snapshot examples/counter/.vk-guard.json"
   },
   "packageManager": "npm@10",
   "peerDependencies": {

@@ -1,0 +1,7 @@
+{
+  "name": "vk-guard-example-counter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Example o1js project that vk-guard checks against itself in CI."
+}
