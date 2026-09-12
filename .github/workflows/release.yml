@@ -41,6 +41,13 @@ jobs:
     permissions:
       contents: write # create the GitHub release and move the major tag
       id-token: write # OIDC credential for npm Trusted Publishing
+    env:
+      # Publishing happens only for a version TAG push. Testing
+      # `github.event_name == 'push'` alone would be a latent footgun: it is
+      # equivalent only while tags are the sole push trigger, so adding a branch
+      # trigger later would silently start publishing from that branch. Checking
+      # the ref makes the intent explicit and keeps every guard honest.
+      RELEASING: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +79,7 @@ jobs:
         timeout-minutes: 15
 
       - name: Check the tag matches package.json
-        if: github.event_name == 'push'
+        if: env.RELEASING == 'true'
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -100,13 +107,13 @@ jobs:
           rm -f "$TARBALL" files.txt
 
       - name: Publish to npm
-        if: github.event_name == 'push'
+        if: env.RELEASING == 'true'
         # No NODE_AUTH_TOKEN: Trusted Publishing supplies a short-lived OIDC
         # credential, and npm attaches a provenance attestation automatically.
         run: npm publish --access public
 
       - name: Move the major version tag
-        if: github.event_name == 'push' && !contains(github.ref_name, '-')
+        if: env.RELEASING == 'true' && !contains(github.ref_name, '-')
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -122,7 +129,7 @@ jobs:
           echo "moved $MAJOR to $GITHUB_SHA"
 
       - name: Create the GitHub release
-        if: github.event_name == 'push'
+        if: env.RELEASING == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -143,7 +150,7 @@ jobs:
           {
             echo "### vk-guard release"
             echo ""
-            if [ "${{ github.event_name }}" = "push" ]; then
+            if [ "$RELEASING" = "true" ]; then
               echo "Published \`$TAG\` to npm with provenance."
             else
               echo "Dry run: all checks passed, nothing published."
