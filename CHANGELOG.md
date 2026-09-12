@@ -5,6 +5,15 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Changed
+
+- The release workflow now publishes when a GitHub Release is published, matching
+  o1js-scan, and authenticates with the `NPM_TOKEN` repository secret (an npm
+  Automation token). It falls back to Trusted Publishing over OIDC when that secret is
+  absent. A direct `vX.Y.Z` tag push still works. This makes the first publish possible
+  from CI, which Trusted Publishing alone could not do for a package that does not yet
+  exist on the registry.
+
 ### Added
 
 - `.github/workflows/release.yml`: tag-driven npm publish via Trusted Publishing (OIDC,
