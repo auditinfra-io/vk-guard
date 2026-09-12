@@ -1,0 +1,34 @@
+{
+  "vkGuardVersion": "0.1.0",
+  "o1jsVersion": "3.0.0",
+  "contracts": {
+    "Counter": {
+      "file": "src/Counter.ts",
+      "kind": "SmartContract",
+      "verificationKeyHash": "17609878734510172312999390341520149576174096919885406581548138984158042861876",
+      "digest": "28b21ef82c11eac43caef828304800537ba7ebde5fa2f699de224531db17e008",
+      "methods": {
+        "increment": {
+          "rows": 615,
+          "digest": "b36e671c87cf5043980baa22bb2daaec"
+        },
+        "reset": {
+          "rows": 626,
+          "digest": "94b89320f7403f9d8df1c0f8165e76c4"
+        }
+      }
+    },
+    "HashChain": {
+      "file": "src/HashChain.ts",
+      "kind": "ZkProgram",
+      "verificationKeyHash": "10740237937470616648841625781663830601043994899084711952961901168222081708728",
+      "digest": "1d631ea46d43cfdbe30640f0ad956ae712f8bdc773b5c0a48c7588d5f0465be6",
+      "methods": {
+        "step": {
+          "rows": 13,
+          "digest": "f4820f163c85110f1a3ae4819556c24e"
+        }
+      }
+    }
+  }
+}

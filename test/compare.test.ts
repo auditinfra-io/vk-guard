@@ -281,3 +281,118 @@ describe('package metadata', () => {
     expect(VK_GUARD_VERSION).toBe(pkg.version);
   });
 });
+
+// Contract and method names come from the user's project and from hand-edited
+// JSON, so they can collide with Object.prototype members. Before the `own()`
+// guard, a contract named `toString` was found on the prototype, treated as a
+// snapshot entry with no verificationKeyHash, and its key comparison silently
+// skipped — reporting no drift. These lock that false pass shut.
+describe('names that collide with Object.prototype', () => {
+  const PROTO_NAMES = ['toString', 'constructor', 'valueOf', 'hasOwnProperty', '__proto__'];
+
+  for (const name of PROTO_NAMES) {
+    it(`treats a contract named "${name}" as new when the snapshot lacks it`, () => {
+      const snap: Snapshot = {
+        vkGuardVersion: '0.1.0',
+        o1jsVersion: '3.0.0',
+        contracts: {},
+      };
+      const m: Measured[] = [
+        {
+          name,
+          file: 'src/Odd.ts',
+          kind: 'SmartContract',
+          verificationKeyHash: 'abc',
+          methods: { go: { rows: 10, digest: 'd' } },
+        },
+      ];
+      const c = compare(snap, m, '3.0.0', false);
+      expect(c.addedContracts).toEqual([name]);
+      expect(c.comparedContracts).toBe(0);
+      expect(c.failed).toBe(true);
+    });
+
+    it(`still compares the verification key of a contract named "${name}"`, () => {
+      const snap: Snapshot = {
+        vkGuardVersion: '0.1.0',
+        o1jsVersion: '3.0.0',
+        contracts: {
+          [name]: {
+            file: 'src/Odd.ts',
+            kind: 'SmartContract',
+            verificationKeyHash: 'BEFORE',
+            methods: { go: { rows: 10, digest: 'd' } },
+          },
+        },
+      };
+      const m: Measured[] = [
+        {
+          name,
+          file: 'src/Odd.ts',
+          kind: 'SmartContract',
+          verificationKeyHash: 'AFTER',
+          methods: { go: { rows: 10, digest: 'd' } },
+        },
+      ];
+      const c = compare(snap, m, '3.0.0', false);
+      expect(c.comparedContracts).toBe(1);
+      expect(c.vkChanges).toEqual([{ contract: name, before: 'BEFORE', after: 'AFTER' }]);
+      expect(c.failed).toBe(true);
+    });
+  }
+
+  it('treats a method named "toString" as new rather than inheriting one', () => {
+    const snap: Snapshot = {
+      vkGuardVersion: '0.1.0',
+      o1jsVersion: '3.0.0',
+      contracts: {
+        C: { file: 'src/C.ts', kind: 'SmartContract', verificationKeyHash: 'k', methods: {} },
+      },
+    };
+    const m: Measured[] = [
+      {
+        name: 'C',
+        file: 'src/C.ts',
+        kind: 'SmartContract',
+        verificationKeyHash: 'k',
+        methods: { toString: { rows: 5, digest: 'd' } },
+      },
+    ];
+    const c = compare(snap, m, '3.0.0', false);
+    expect(c.addedMethods).toEqual([{ contract: 'C', method: 'toString' }]);
+    expect(c.comparedMethods).toBe(0);
+  });
+
+  it('does not inherit a row tolerance from Object.prototype', () => {
+    const snap: Snapshot = {
+      vkGuardVersion: '0.1.0',
+      o1jsVersion: '3.0.0',
+      // No tolerance is configured for anything, so the default of 0 must apply
+      // even though `rowTolerance.constructor` resolves on the prototype.
+      config: { rowTolerance: {} },
+      contracts: {
+        // `constructor` as a key collides with Object.prototype, which also
+        // defeats TypeScript's contextual typing here — hence the assertion.
+        constructor: {
+          file: 'src/C.ts',
+          kind: 'SmartContract' as const,
+          verificationKeyHash: 'k',
+          methods: { go: { rows: 10, digest: 'd' } },
+        },
+      },
+    };
+    const m: Measured[] = [
+      {
+        name: 'constructor',
+        file: 'src/C.ts',
+        kind: 'SmartContract',
+        verificationKeyHash: 'k',
+        methods: { go: { rows: 99, digest: 'd' } },
+      },
+    ];
+    const c = compare(snap, m, '3.0.0', false);
+    expect(c.rowChanges[0]!.tolerance).toBe(0);
+    expect(c.rowChanges[0]!.withinTolerance).toBe(false);
+    expect(c.failed).toBe(true);
+  });
+});

@@ -7,7 +7,42 @@ updates:
     groups:
       development-dependencies:
         dependency-type: development
+        # o1js is excluded deliberately. It is both a devDependency and the
+        # peerDependency this tool measures, so bumping it is a product
+        # decision, not a chore: every verification key changes, the example
+        # snapshot in examples/counter has to be regenerated with
+        # `vk-guard update`, and the supported peer range needs widening.
+        # Grouping it with vitest and @types/node would hide all of that.
+        exclude-patterns:
+          - o1js
+    ignore:
+      # typescript is a RUNTIME dependency here, not a build tool: vk-guard
+      # drives the compiler API directly (ts.createProgram, program.emit with a
+      # writeFile callback, ts.parseJsonConfigFileContent). A major bump is an
+      # API-compatibility question that has to be tested by hand, so it must not
+      # arrive as an automated PR.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    ignore:
+      # These four actions are used by action.yml, which is this repository's
+      # PUBLISHED product surface, not just its internal CI. Bumping
+      # actions/setup-node to a new major raises the runtime floor for every
+      # consumer of `auditinfra-io/vk-guard`, so it belongs in a release note
+      # rather than an automated PR. Minor and patch updates still flow through.
+      - dependency-name: actions/setup-node
+        update-types: ['version-update:semver-major']
+      - dependency-name: actions/checkout
+        update-types: ['version-update:semver-major']
+      - dependency-name: actions/cache
+        update-types: ['version-update:semver-major']
+      - dependency-name: actions/github-script
+        update-types: ['version-update:semver-major']

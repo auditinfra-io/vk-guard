@@ -1,5 +1,23 @@
 import type { Snapshot, Measured, SnapshotConfig } from './types.js';
 
+/**
+ * Read a key from a plain object, ignoring anything inherited from
+ * `Object.prototype`.
+ *
+ * Snapshot keys are contract and method names supplied by the user's project
+ * and by hand-edited JSON, so nothing stops one being called `toString`,
+ * `constructor`, or `valueOf`. A bare `record[key]` would then return an
+ * inherited function instead of `undefined`, and the caller would treat a
+ * contract that is absent from the snapshot as present-but-blank: its
+ * `verificationKeyHash` reads as `undefined`, the key comparison is skipped,
+ * and the run reports no drift. That is a false pass, which is the one
+ * outcome this tool must never produce.
+ */
+function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
+  if (record === undefined) return undefined;
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
 export type VkChange = { contract: string; before: string; after: string };
 export type DigestChange = { contract: string; method: string };
 export type RowChange = {
@@ -74,7 +92,7 @@ export function compare(
   }
 
   for (const m of measured) {
-    const prev = snapshot.contracts[m.name];
+    const prev = own(snapshot.contracts, m.name);
     if (!prev) {
       c.addedContracts.push(m.name);
       continue;
@@ -96,7 +114,7 @@ export function compare(
     }
 
     for (const [method, cur] of Object.entries(m.methods)) {
-      const before = prev.methods?.[method];
+      const before = own(prev.methods, method);
       if (!before) {
         c.addedMethods.push({ contract: m.name, method });
         continue;
@@ -125,7 +143,9 @@ export function compare(
     }
 
     for (const method of Object.keys(prev.methods ?? {})) {
-      if (!(method in m.methods)) c.removedMethods.push({ contract: m.name, method });
+      if (own(m.methods, method) === undefined) {
+        c.removedMethods.push({ contract: m.name, method });
+      }
     }
   }
 
@@ -153,5 +173,5 @@ export function compare(
 function toleranceFor(config: SnapshotConfig, contract: string, method: string): number {
   const t = config.rowTolerance;
   if (!t) return 0;
-  return t[`${contract}.${method}`] ?? t[contract] ?? t.default ?? 0;
+  return own(t, `${contract}.${method}`) ?? own(t, contract) ?? own(t, 'default') ?? 0;
 }

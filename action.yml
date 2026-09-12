@@ -31,9 +31,13 @@ inputs:
     required: false
     default: '20'
   version:
-    description: 'vk-guard version to install from npm. Override only to test another release.'
+    description: 'vk-guard version to install from npm. Override only to test another release. Ignored when source is "action".'
     required: false
     default: '0.1.0'
+  source:
+    description: 'Where to install vk-guard from: "npm" (the published release named by `version`), or "action" to build it from this action checkout. Use "action" to pin to a git ref, or while the package is not yet published to npm.'
+    required: false
+    default: 'npm'
   install:
     description: 'Run the project dependency install before checking. o1js must be installed for vk-guard to measure anything.'
     required: false
@@ -139,13 +143,37 @@ runs:
       shell: bash
       env:
         VK_GUARD_VERSION: ${{ inputs.version }}
+        SOURCE: ${{ inputs.source }}
       run: |
         set -euo pipefail
-        if [ -z "$VK_GUARD_VERSION" ]; then
-          echo "::error::version must not be empty; pin the vk-guard release to execute"
-          exit 1
-        fi
-        npm install --global "vk-guard@$VK_GUARD_VERSION"
+        case "$SOURCE" in
+          npm)
+            if [ -z "$VK_GUARD_VERSION" ]; then
+              echo "::error::version must not be empty when source is 'npm'; pin the vk-guard release to execute"
+              exit 1
+            fi
+            npm install --global "vk-guard@$VK_GUARD_VERSION"
+            ;;
+          action)
+            # Build from this action's own checkout and install the packed
+            # tarball.
+            #
+            # Installing the directory directly (npm install --global "$DIR")
+            # does NOT work: npm links the source tree without running prepack,
+            # so dist/ is never built, the `files` allowlist is ignored, and no
+            # bin is created. Packing first yields a real tarball with dist/ and
+            # a working binary.
+            npm ci --prefix "$GITHUB_ACTION_PATH"
+            npm --prefix "$GITHUB_ACTION_PATH" run build
+            TARBALL="$(cd "$GITHUB_ACTION_PATH" && npm pack --silent | tail -1)"
+            npm install --global "$GITHUB_ACTION_PATH/$TARBALL"
+            ;;
+          *)
+            echo "::error::invalid source '$SOURCE'; expected 'npm' or 'action'"
+            exit 1
+            ;;
+        esac
+        vk-guard --version
 
     - name: Run vk-guard
       id: check
