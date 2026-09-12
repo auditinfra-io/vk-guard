@@ -7,10 +7,11 @@
 **Verification-key and constraint-count regression guard for [o1js](https://github.com/o1-labs/o1js) zkApps.**
 
 > **Status: not yet published to npm.** `npm install vk-guard` and the npm badge above
-> will not resolve until the first release is pushed. Until then, install from git and
-> run the Action with `source: action` (both shown below). Everything else works today —
-> CI runs the full suite plus a self-check against [`examples/counter`](examples/counter)
-> on every pull request.
+> will not resolve until the first release is cut. Publishing a GitHub Release for tag
+> `vX.Y.Z` runs [`release.yml`](.github/workflows/release.yml) and ships it. Until then,
+> install from git and run the Action with `source: action` (both shown below).
+> Everything else works today — CI runs the full suite plus a self-check against
+> [`examples/counter`](examples/counter) on every pull request.
 
 Changing a circuit changes its verification key. A changed verification key no longer
 matches the one stored on-chain, so every already-deployed instance of that zkApp

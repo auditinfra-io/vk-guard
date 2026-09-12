@@ -37,24 +37,26 @@ rather than a quick baseline rewrite.
 
 ## Releasing
 
-The first publish has to be done by hand, because npm can only configure Trusted
-Publishing for a package that already exists:
+Releases publish to npm automatically, the same way o1js-scan does:
 
-```bash
-npm login
-npm publish --access public   # prepack builds dist/
-```
+1. Bump the version in `package.json` and update `CHANGELOG.md`, then merge.
+2. Cut a GitHub Release for tag `vX.Y.Z`.
 
-Then enable Trusted Publishing on npmjs.com (package -> Settings -> Trusted Publisher ->
-GitHub Actions) pointing at this repository and `.github/workflows/release.yml`. Every
-release after that runs through the workflow with **no stored npm token** — GitHub
-supplies a short-lived OIDC credential and npm attaches a provenance attestation.
+Publishing the release runs `.github/workflows/release.yml`, which authenticates with the
+`NPM_TOKEN` repository secret. Pushing a `vX.Y.Z` tag directly works too.
 
-To cut a release: bump the version in `package.json`, update `CHANGELOG.md`, merge, then
+`NPM_TOKEN` must be an npm **Automation** token (or a granular token with "Bypass
+two-factor authentication" enabled for publish). A classic read-write token without 2FA
+bypass fails with `403 Two-factor authentication or granular access token with bypass 2fa
+enabled is required to publish packages`.
 
-```bash
-git tag v0.2.0 && git push origin v0.2.0
-```
+If `NPM_TOKEN` is removed, the workflow falls back to npm Trusted Publishing over OIDC,
+which needs a trusted publisher for this repo and `release.yml` registered on npmjs.com.
+That is the better long-term setup — nothing long-lived to leak — but it can only be
+configured for a package that already exists, which is why the token path exists at all.
+
+There is no PyPI step here. Unlike o1js-scan, vk-guard is a Node/TypeScript package with
+no Python artifact.
 
 The workflow refuses to publish if the tag and `package.json` disagree, runs the full
 suite plus `example:check` first, verifies `examples/` and `test/` stayed out of the
