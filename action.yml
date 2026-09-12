@@ -128,7 +128,7 @@ runs:
     # include the o1js version, so artifacts are never shared across versions.
     - name: Cache o1js compile artifacts
       if: ${{ inputs.cache == 'true' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ${{ inputs.working-directory }}/${{ inputs.cache-dir }}
         key: vk-guard-o1js-${{ steps.o1js.outputs.version }}-${{ steps.lock.outputs.hash }}-${{ runner.os }}
