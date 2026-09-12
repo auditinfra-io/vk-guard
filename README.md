@@ -6,13 +6,6 @@
 
 **Verification-key and constraint-count regression guard for [o1js](https://github.com/o1-labs/o1js) zkApps.**
 
-> **Status: not yet published to npm.** `npm install vk-guard` and the npm badge above
-> will not resolve until the first release is cut. Publishing a GitHub Release for tag
-> `vX.Y.Z` runs [`release.yml`](.github/workflows/release.yml) and ships it. Until then,
-> install from git and run the Action with `source: action` (both shown below).
-> Everything else works today — CI runs the full suite plus a self-check against
-> [`examples/counter`](examples/counter) on every pull request.
-
 Changing a circuit changes its verification key. A changed verification key no longer
 matches the one stored on-chain, so every already-deployed instance of that zkApp
 breaks and must be redeployed. The o1js CHANGELOG documents this happening repeatedly —
@@ -52,11 +45,7 @@ Constraint count changed:
 Requires Node.js 20 or newer and an o1js project.
 
 ```bash
-# once published:
 npm install --save-dev vk-guard
-
-# until then, install straight from git:
-npm install --save-dev github:auditinfra-io/vk-guard
 ```
 
 o1js is a **peer dependency**. vk-guard always measures the o1js your project builds
@@ -253,25 +242,23 @@ jobs:
       pull-requests: write   # only needed for comment-on-pr
     steps:
       - uses: actions/checkout@v4
-      - uses: auditinfra-io/vk-guard@main
-        with:
-          # Builds vk-guard from this action's own checkout. Required until the
-          # package is on npm; also the way to pin to an exact git ref.
-          source: action
+      - uses: auditinfra-io/vk-guard@v0
 ```
 
-Once the package is published, drop the `source` input and pin the major-version
-tag instead — `auditinfra-io/vk-guard@v0` while the tool is pre-1.0, `@v1` after that.
-The release workflow moves that alias on every release.
+`@v0` is the major-version alias, moved by the release workflow on every release. It
+stays `@v0` while the tool is pre-1.0 and becomes `@v1` after that. Pin an exact release
+(`@v0.1.0`) if you would rather approve each upgrade yourself.
 
 Inputs: `working-directory`, `entry`, `rows-only`, `cache-dir`, `snapshot`,
 `node-version`, `version`, `source`, `install`, `install-command`, `cache`,
 `comment-on-pr`, `fail-on-drift`. Outputs: `drift`, `summary`, `json-file`.
 
-`source` selects where the tool itself comes from: `npm` (default) installs the release
-named by `version`; `action` runs `npm ci`, builds, packs and installs the tarball from
-the action checkout. Installing the checkout directory directly does not work — npm
-links it without running `prepack`, so `dist/` is never built and no binary is created.
+`source` selects where the tool itself comes from. The default, `npm`, installs the
+release named by `version`. Setting `source: action` instead builds vk-guard from the
+action's own checkout, which is how you run an unreleased commit — pin the action to a
+git SHA and it uses exactly that code. (Installing the checkout directory directly does
+not work: npm links it without running `prepack`, so `dist/` is never built and no binary
+is created. The action packs a tarball first.)
 
 The Action pins its default npm package version to the version released with the Action,
 so a tagged workflow cannot silently begin executing a newer package. Set `version`
@@ -284,9 +271,8 @@ lockfile hash, and posts (and updates) a single pull request comment summarizing
 `rows-only: true` and run the full check on a schedule or before release:
 
 ```yaml
-      - uses: auditinfra-io/vk-guard@main
+      - uses: auditinfra-io/vk-guard@v0
         with:
-          source: action
           rows-only: true
 ```
 
