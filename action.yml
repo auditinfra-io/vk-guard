@@ -31,9 +31,9 @@ inputs:
     required: false
     default: '20'
   version:
-    description: 'vk-guard version to install from npm (empty = latest).'
+    description: 'vk-guard version to install from npm. Override only to test another release.'
     required: false
-    default: ''
+    default: '0.1.0'
   install:
     description: 'Run the project dependency install before checking. o1js must be installed for vk-guard to measure anything.'
     required: false
@@ -141,11 +141,11 @@ runs:
         VK_GUARD_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        if [ -n "$VK_GUARD_VERSION" ]; then
-          npm install --global "vk-guard@$VK_GUARD_VERSION"
-        else
-          npm install --global vk-guard
+        if [ -z "$VK_GUARD_VERSION" ]; then
+          echo "::error::version must not be empty; pin the vk-guard release to execute"
+          exit 1
         fi
+        npm install --global "vk-guard@$VK_GUARD_VERSION"
 
     - name: Run vk-guard
       id: check
@@ -173,7 +173,7 @@ runs:
           const { readFileSync } = require("fs");
           try {
             const r = JSON.parse(readFileSync("vk-guard-result.json", "utf8"));
-            process.stdout.write(r.summary || r.error || "");
+            process.stdout.write(String(r.summary || r.error || "").replace(/\s+/g, " ").trim());
           } catch { process.stdout.write(""); }
         ')"
         echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
@@ -206,11 +206,13 @@ runs:
     - name: Comment on pull request
       if: ${{ inputs.comment-on-pr == 'true' && steps.check.outputs.drift == 'true' && github.event_name == 'pull_request' }}
       uses: actions/github-script@v7
+      env:
+        VK_GUARD_WORKING_DIRECTORY: ${{ inputs.working-directory }}
       with:
         script: |
           const fs = require('fs');
           const path = require('path');
-          const file = path.join(process.env.GITHUB_WORKSPACE, '${{ inputs.working-directory }}', 'vk-guard-result.json');
+          const file = path.join(process.env.GITHUB_WORKSPACE, process.env.VK_GUARD_WORKING_DIRECTORY, 'vk-guard-result.json');
 
           let r;
           try {

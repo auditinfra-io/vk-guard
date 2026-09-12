@@ -10,11 +10,11 @@ export const SNAPSHOT_FILE = '.vk-guard.json';
  * trivial reordering of imports would show up as a large diff.
  */
 export function serializeSnapshot(snap: Snapshot): string {
-  const contracts: Record<string, unknown> = {};
-  for (const name of Object.keys(snap.contracts).sort()) {
-    const c = snap.contracts[name]!;
-    contracts[name] = orderedContract(c);
-  }
+  const contracts = Object.fromEntries(
+    Object.keys(snap.contracts)
+      .sort()
+      .map((name) => [name, orderedContract(snap.contracts[name]!)])
+  );
   const out: Record<string, unknown> = {
     vkGuardVersion: snap.vkGuardVersion,
     o1jsVersion: snap.o1jsVersion,
@@ -26,13 +26,16 @@ export function serializeSnapshot(snap: Snapshot): string {
 }
 
 function orderedContract(c: ContractEntry): Record<string, unknown> {
-  const methods: Record<string, MethodEntry> = {};
-  for (const m of Object.keys(c.methods).sort()) {
-    const entry = c.methods[m]!;
-    const ordered: MethodEntry = { rows: entry.rows };
-    if (entry.digest !== undefined) ordered.digest = entry.digest;
-    methods[m] = ordered;
-  }
+  const methods = Object.fromEntries(
+    Object.keys(c.methods)
+      .sort()
+      .map((name) => {
+        const entry = c.methods[name]!;
+        const ordered: MethodEntry = { rows: entry.rows };
+        if (entry.digest !== undefined) ordered.digest = entry.digest;
+        return [name, ordered];
+      })
+  );
   const out: Record<string, unknown> = { file: c.file, kind: c.kind };
   if (c.verificationKeyHash !== undefined) out.verificationKeyHash = c.verificationKeyHash;
   if (c.digest !== undefined) out.digest = c.digest;
@@ -74,14 +77,71 @@ function validateSnapshot(parsed: unknown, path: string): Snapshot {
   if (typeof o.o1jsVersion !== 'string') {
     throw new Error(`${path} is missing "o1jsVersion". Regenerate it with \`vk-guard update\`.`);
   }
-  if (typeof o.contracts !== 'object' || o.contracts === null) {
+  if (!isRecord(o.contracts)) {
     throw new Error(`${path} is missing "contracts". Regenerate it with \`vk-guard update\`.`);
   }
+  const contracts = Object.fromEntries(
+    Object.entries(o.contracts).map(([name, value]) => [name, validateContract(value, path, name)])
+  );
+  const config = validateConfig(o.config, path);
   return {
     vkGuardVersion: typeof o.vkGuardVersion === 'string' ? o.vkGuardVersion : '0.0.0',
     o1jsVersion: o.o1jsVersion,
     rowsOnly: o.rowsOnly === true,
-    config: (o.config as Snapshot['config']) ?? undefined,
-    contracts: o.contracts as Record<string, ContractEntry>,
+    config,
+    contracts,
   };
+}
+
+function validateContract(value: unknown, path: string, name: string): ContractEntry {
+  if (!isRecord(value)) invalid(path, `contract "${name}" must be an object`);
+  if (typeof value.file !== 'string') invalid(path, `contract "${name}" is missing a string "file"`);
+  if (value.kind !== 'SmartContract' && value.kind !== 'ZkProgram') {
+    invalid(path, `contract "${name}" has an invalid "kind"`);
+  }
+  if (!isRecord(value.methods)) invalid(path, `contract "${name}" is missing "methods"`);
+
+  const methods = Object.fromEntries(Object.entries(value.methods).map(([method, entry]) => {
+    if (!isRecord(entry) || !Number.isSafeInteger(entry.rows) || (entry.rows as number) < 0) {
+      invalid(path, `method "${name}.${method}" must have a non-negative integer "rows"`);
+    }
+    if (entry.digest !== undefined && typeof entry.digest !== 'string') {
+      invalid(path, `method "${name}.${method}" has a non-string "digest"`);
+    }
+    return [method, { rows: entry.rows as number, ...(entry.digest === undefined ? {} : { digest: entry.digest as string }) }];
+  }));
+  for (const key of ['verificationKeyHash', 'digest'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') {
+      invalid(path, `contract "${name}" has a non-string "${key}"`);
+    }
+  }
+  return {
+    file: value.file as string,
+    kind: value.kind as ContractEntry['kind'],
+    methods,
+    ...(value.verificationKeyHash === undefined ? {} : { verificationKeyHash: value.verificationKeyHash as string }),
+    ...(value.digest === undefined ? {} : { digest: value.digest as string }),
+  };
+}
+
+function validateConfig(value: unknown, path: string): Snapshot['config'] {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) invalid(path, '"config" must be an object');
+  if (value.rowTolerance === undefined) return {};
+  if (!isRecord(value.rowTolerance)) invalid(path, '"config.rowTolerance" must be an object');
+  const rowTolerance = Object.fromEntries(Object.entries(value.rowTolerance).map(([key, tolerance]) => {
+    if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {
+      invalid(path, `row tolerance "${key}" must be a non-negative number`);
+    }
+    return [key, tolerance as number];
+  }));
+  return { rowTolerance };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function invalid(path: string, message: string): never {
+  throw new Error(`${path}: ${message}. Regenerate it with \`vk-guard update\`.`);
 }

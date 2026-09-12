@@ -13,9 +13,19 @@
     "zk"
   ],
   "license": "MIT",
+  "author": "auditinfra-io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auditinfra-io/vk-guard.git"
+  },
+  "homepage": "https://github.com/auditinfra-io/vk-guard#readme",
+  "bugs": {
+    "url": "https://github.com/auditinfra-io/vk-guard/issues"
+  },
   "type": "module",
+  "sideEffects": false,
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "bin": {
     "vk-guard": "dist/cli.js"
@@ -37,10 +47,13 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "npm run build"
+    "check": "npm run typecheck && npm test",
+    "pretest": "npm run build",
+    "prepack": "npm run build"
   },
+  "packageManager": "npm@10",
   "peerDependencies": {
-    "o1js": ">=1.0.0 <4.0.0"
+    "o1js": ">=3.0.0 <4.0.0"
   },
   "dependencies": {
     "tinyglobby": "^0.2.10",

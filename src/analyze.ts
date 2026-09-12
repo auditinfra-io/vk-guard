@@ -43,10 +43,12 @@ export async function measure(
 
     const analysis = await failLoudly(d, 'analyzeMethods()', () => d.target.analyzeMethods());
 
-    const methods: Measured['methods'] = {};
-    for (const [methodName, info] of Object.entries(analysis)) {
-      methods[methodName] = { rows: info.rows, digest: info.digest };
-    }
+    const methods = Object.fromEntries(
+      Object.entries(analysis).map(([methodName, info]) => [
+        methodName,
+        { rows: info.rows, digest: info.digest },
+      ])
+    );
 
     const entry: Measured = {
       name: d.name,

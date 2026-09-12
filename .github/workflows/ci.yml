@@ -7,12 +7,18 @@ on:
 
 jobs:
   test:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -20,3 +26,8 @@ jobs:
       # Circuit compilation dominates the suite; give it room.
       - run: npm test
         timeout-minutes: 30
+      - name: Verify publishable package
+        run: |
+          npm pack --dry-run
+          test -f dist/cli.js
+          test -f dist/index.js
