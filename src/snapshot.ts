@@ -10,11 +10,11 @@ export const SNAPSHOT_FILE = '.vk-guard.json';
  * trivial reordering of imports would show up as a large diff.
  */
 export function serializeSnapshot(snap: Snapshot): string {
-  const contracts: Record<string, unknown> = {};
-  for (const name of Object.keys(snap.contracts).sort()) {
-    const c = snap.contracts[name]!;
-    contracts[name] = orderedContract(c);
-  }
+  const contracts = Object.fromEntries(
+    Object.keys(snap.contracts)
+      .sort()
+      .map((name) => [name, orderedContract(snap.contracts[name]!)])
+  );
   const out: Record<string, unknown> = {
     vkGuardVersion: snap.vkGuardVersion,
     o1jsVersion: snap.o1jsVersion,
@@ -26,13 +26,16 @@ export function serializeSnapshot(snap: Snapshot): string {
 }
 
 function orderedContract(c: ContractEntry): Record<string, unknown> {
-  const methods: Record<string, MethodEntry> = {};
-  for (const m of Object.keys(c.methods).sort()) {
-    const entry = c.methods[m]!;
-    const ordered: MethodEntry = { rows: entry.rows };
-    if (entry.digest !== undefined) ordered.digest = entry.digest;
-    methods[m] = ordered;
-  }
+  const methods = Object.fromEntries(
+    Object.keys(c.methods)
+      .sort()
+      .map((name) => {
+        const entry = c.methods[name]!;
+        const ordered: MethodEntry = { rows: entry.rows };
+        if (entry.digest !== undefined) ordered.digest = entry.digest;
+        return [name, ordered];
+      })
+  );
   const out: Record<string, unknown> = { file: c.file, kind: c.kind };
   if (c.verificationKeyHash !== undefined) out.verificationKeyHash = c.verificationKeyHash;
   if (c.digest !== undefined) out.digest = c.digest;
@@ -77,10 +80,9 @@ function validateSnapshot(parsed: unknown, path: string): Snapshot {
   if (!isRecord(o.contracts)) {
     throw new Error(`${path} is missing "contracts". Regenerate it with \`vk-guard update\`.`);
   }
-  const contracts: Record<string, ContractEntry> = {};
-  for (const [name, value] of Object.entries(o.contracts)) {
-    contracts[name] = validateContract(value, path, name);
-  }
+  const contracts = Object.fromEntries(
+    Object.entries(o.contracts).map(([name, value]) => [name, validateContract(value, path, name)])
+  );
   const config = validateConfig(o.config, path);
   return {
     vkGuardVersion: typeof o.vkGuardVersion === 'string' ? o.vkGuardVersion : '0.0.0',
@@ -99,16 +101,15 @@ function validateContract(value: unknown, path: string, name: string): ContractE
   }
   if (!isRecord(value.methods)) invalid(path, `contract "${name}" is missing "methods"`);
 
-  const methods: Record<string, MethodEntry> = {};
-  for (const [method, entry] of Object.entries(value.methods)) {
+  const methods = Object.fromEntries(Object.entries(value.methods).map(([method, entry]) => {
     if (!isRecord(entry) || !Number.isSafeInteger(entry.rows) || (entry.rows as number) < 0) {
       invalid(path, `method "${name}.${method}" must have a non-negative integer "rows"`);
     }
     if (entry.digest !== undefined && typeof entry.digest !== 'string') {
       invalid(path, `method "${name}.${method}" has a non-string "digest"`);
     }
-    methods[method] = { rows: entry.rows as number, ...(entry.digest === undefined ? {} : { digest: entry.digest as string }) };
-  }
+    return [method, { rows: entry.rows as number, ...(entry.digest === undefined ? {} : { digest: entry.digest as string }) }];
+  }));
   for (const key of ['verificationKeyHash', 'digest'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
       invalid(path, `contract "${name}" has a non-string "${key}"`);
@@ -128,13 +129,12 @@ function validateConfig(value: unknown, path: string): Snapshot['config'] {
   if (!isRecord(value)) invalid(path, '"config" must be an object');
   if (value.rowTolerance === undefined) return {};
   if (!isRecord(value.rowTolerance)) invalid(path, '"config.rowTolerance" must be an object');
-  const rowTolerance: Record<string, number> = {};
-  for (const [key, tolerance] of Object.entries(value.rowTolerance)) {
+  const rowTolerance = Object.fromEntries(Object.entries(value.rowTolerance).map(([key, tolerance]) => {
     if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {
       invalid(path, `row tolerance "${key}" must be a non-negative number`);
     }
-    rowTolerance[key] = tolerance as number;
-  }
+    return [key, tolerance as number];
+  }));
   return { rowTolerance };
 }
 

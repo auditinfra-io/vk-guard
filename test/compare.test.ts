@@ -240,6 +240,27 @@ describe('snapshot validation', () => {
     }));
     expect(() => readSnapshot(path)).toThrow(/row tolerance "default" must be a non-negative number/);
   });
+
+  it('preserves __proto__ as an own contract and method key', () => {
+    const path = join(REPO_ROOT, 'test', '.tmp', 'prototype-named-contract.json');
+    const contract = {
+      file: 'src/Prototype.ts',
+      kind: 'SmartContract',
+      methods: Object.fromEntries([['__proto__', { rows: 1, digest: 'method-digest' }]]),
+    };
+    writeFileSync(path, JSON.stringify({
+      o1jsVersion: '3.0.0',
+      contracts: Object.fromEntries([['__proto__', contract]]),
+    }));
+
+    const parsed = readSnapshot(path);
+    expect(Object.hasOwn(parsed.contracts, '__proto__')).toBe(true);
+    expect(Object.hasOwn(parsed.contracts.__proto__!.methods, '__proto__')).toBe(true);
+
+    const serialized = JSON.parse(serializeSnapshot(parsed)) as Snapshot;
+    expect(Object.hasOwn(serialized.contracts, '__proto__')).toBe(true);
+    expect(Object.hasOwn(serialized.contracts.__proto__!.methods, '__proto__')).toBe(true);
+  });
 });
 
 describe('summary line', () => {
