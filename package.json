@@ -1,0 +1,54 @@
+{
+  "name": "vk-guard",
+  "version": "0.1.0",
+  "description": "Verification-key and constraint-count regression guard for o1js zkApps. Fails CI when a circuit change would break already-deployed contracts.",
+  "keywords": [
+    "o1js",
+    "mina",
+    "zkapp",
+    "verification-key",
+    "regression",
+    "ci",
+    "constraint-count",
+    "zk"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "vk-guard": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build"
+  },
+  "peerDependencies": {
+    "o1js": ">=1.0.0 <4.0.0"
+  },
+  "dependencies": {
+    "tinyglobby": "^0.2.10",
+    "typescript": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "o1js": "^3.0.0",
+    "vitest": "^2.1.0"
+  }
+}

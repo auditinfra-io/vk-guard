@@ -1,0 +1,298 @@
+name: 'vk-guard'
+description: 'Verification-key and constraint-count regression guard for o1js zkApps. Fails CI when a circuit change would break already-deployed contracts.'
+author: 'auditinfra-io'
+branding:
+  icon: 'lock'
+  color: 'purple'
+
+inputs:
+  working-directory:
+    description: 'Directory containing the o1js project to check.'
+    required: false
+    default: '.'
+  entry:
+    description: 'Entry glob overriding contract discovery (default: src/**/*.ts). Space-separate multiple globs.'
+    required: false
+    default: ''
+  rows-only:
+    description: 'Skip compile() and compare constraint rows and circuit digests only. Much faster; does not compare verification keys.'
+    required: false
+    default: 'false'
+  cache-dir:
+    description: 'o1js compile cache location, relative to working-directory.'
+    required: false
+    default: '.vk-guard-cache'
+  snapshot:
+    description: 'Snapshot file to compare against.'
+    required: false
+    default: '.vk-guard.json'
+  node-version:
+    description: 'Node.js version to use.'
+    required: false
+    default: '20'
+  version:
+    description: 'vk-guard version to install from npm (empty = latest).'
+    required: false
+    default: ''
+  install:
+    description: 'Run the project dependency install before checking. o1js must be installed for vk-guard to measure anything.'
+    required: false
+    default: 'true'
+  install-command:
+    description: 'Command used when install is true.'
+    required: false
+    default: 'npm ci'
+  cache:
+    description: 'Cache o1js compile artifacts across runs, keyed on the o1js version and the lockfile hash.'
+    required: false
+    default: 'true'
+  comment-on-pr:
+    description: 'Post (and update) a pull request comment summarizing drift when it occurs.'
+    required: false
+    default: 'true'
+  fail-on-drift:
+    description: 'Fail the job when drift is detected. Set false to report without gating.'
+    required: false
+    default: 'true'
+
+outputs:
+  drift:
+    description: 'true when drift was detected, false otherwise.'
+    value: ${{ steps.check.outputs.drift }}
+  summary:
+    description: 'One-line summary of what was checked, e.g. "4 contracts, 17 methods, o1js 2.4.0".'
+    value: ${{ steps.check.outputs.summary }}
+  json-file:
+    description: 'Path to the machine-readable result written by vk-guard.'
+    value: ${{ steps.check.outputs.json-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install project dependencies
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        ${{ inputs.install-command }}
+
+    - name: Resolve o1js version
+      id: o1js
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        # Read package.json by path: o1js declares an "exports" map that does
+        # not expose ./package.json, so require('o1js/package.json') fails.
+        VERSION="$(node -e '
+          const { readFileSync } = require("fs");
+          const { join } = require("path");
+          try {
+            process.stdout.write(JSON.parse(readFileSync(join(process.cwd(), "node_modules/o1js/package.json"), "utf8")).version);
+          } catch {
+            process.stdout.write("");
+          }
+        ')"
+        if [ -z "$VERSION" ]; then
+          echo "::error::could not resolve o1js in ${{ inputs.working-directory }}. Is it installed? (set install: true, or install it yourself before this step)"
+          exit 1
+        fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "o1js $VERSION"
+
+    - name: Hash lockfile
+      id: lock
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        LOCK=""
+        for f in package-lock.json pnpm-lock.yaml yarn.lock npm-shrinkwrap.json; do
+          if [ -f "$f" ]; then LOCK="$f"; break; fi
+        done
+        if [ -n "$LOCK" ]; then
+          HASH="$(sha256sum "$LOCK" | cut -d' ' -f1)"
+        else
+          HASH="nolock"
+        fi
+        echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+    # Keyed on the o1js version as well as the lockfile: o1js's own cache
+    # entries are content-addressed on the circuit, but that address does not
+    # include the o1js version, so artifacts are never shared across versions.
+    - name: Cache o1js compile artifacts
+      if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.working-directory }}/${{ inputs.cache-dir }}
+        key: vk-guard-o1js-${{ steps.o1js.outputs.version }}-${{ steps.lock.outputs.hash }}-${{ runner.os }}
+        restore-keys: |
+          vk-guard-o1js-${{ steps.o1js.outputs.version }}-
+
+    - name: Install vk-guard
+      shell: bash
+      env:
+        VK_GUARD_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ -n "$VK_GUARD_VERSION" ]; then
+          npm install --global "vk-guard@$VK_GUARD_VERSION"
+        else
+          npm install --global vk-guard
+        fi
+
+    - name: Run vk-guard
+      id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENTRY: ${{ inputs.entry }}
+        ROWS_ONLY: ${{ inputs.rows-only }}
+        CACHE_DIR: ${{ inputs.cache-dir }}
+        SNAPSHOT: ${{ inputs.snapshot }}
+      run: |
+        set -uo pipefail
+        ARGS=(check --json --cache-dir "$CACHE_DIR" --snapshot "$SNAPSHOT")
+        if [ "$ROWS_ONLY" = "true" ]; then ARGS+=(--rows-only); fi
+        for glob in $ENTRY; do ARGS+=(--entry "$glob"); done
+
+        set +e
+        vk-guard "${ARGS[@]}" > vk-guard-result.json
+        STATUS=$?
+        set -e
+
+        cat vk-guard-result.json
+
+        SUMMARY="$(node -e '
+          const { readFileSync } = require("fs");
+          try {
+            const r = JSON.parse(readFileSync("vk-guard-result.json", "utf8"));
+            process.stdout.write(r.summary || r.error || "");
+          } catch { process.stdout.write(""); }
+        ')"
+        echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+        echo "json-file=vk-guard-result.json" >> "$GITHUB_OUTPUT"
+        if [ "$STATUS" -eq 0 ]; then
+          echo "drift=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "drift=true" >> "$GITHUB_OUTPUT"
+        fi
+        echo "exit-status=$STATUS" >> "$GITHUB_OUTPUT"
+
+    - name: Write job summary
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DRIFT: ${{ steps.check.outputs.drift }}
+        SUMMARY: ${{ steps.check.outputs.summary }}
+      run: |
+        set -euo pipefail
+        {
+          echo "### vk-guard"
+          echo ""
+          if [ "$DRIFT" = "true" ]; then
+            echo "**Drift detected.** $SUMMARY"
+          else
+            echo "No drift. $SUMMARY"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on pull request
+      if: ${{ inputs.comment-on-pr == 'true' && steps.check.outputs.drift == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const file = path.join(process.env.GITHUB_WORKSPACE, '${{ inputs.working-directory }}', 'vk-guard-result.json');
+
+          let r;
+          try {
+            r = JSON.parse(fs.readFileSync(file, 'utf8'));
+          } catch (e) {
+            core.warning(`could not read vk-guard result: ${e.message}`);
+            return;
+          }
+
+          const abbrev = (h) => (typeof h === 'string' && h.length > 18 ? `${h.slice(0, 10)}…${h.slice(-4)}` : h);
+          const lines = [];
+
+          if (r.error) {
+            lines.push('vk-guard could not complete the check:', '', '```', r.error, '```');
+          } else {
+            const vk = r.verificationKeyChanges ?? [];
+            if (r.o1js?.explainsVerificationKeyChanges) {
+              lines.push(
+                `**o1js ${r.o1js.snapshot} → ${r.o1js.current}**`,
+                '',
+                `All ${vk.length} verification key${vk.length === 1 ? '' : 's'} changed as a result.`,
+                'Deployed zkApps compiled with the previous version will no longer match',
+                'on-chain verification keys and **must be redeployed**.'
+              );
+            } else if (vk.length > 0) {
+              lines.push(
+                `**${vk.length} verification key${vk.length === 1 ? '' : 's'} changed.**`,
+                '',
+                r.o1js?.changed
+                  ? `o1js also changed (${r.o1js.snapshot} → ${r.o1js.current}), but not every key moved, so the upgrade alone does not explain this.`
+                  : `o1js is unchanged (${r.o1js?.current}), so this follows from a change in this PR.`,
+                '',
+                'Any already-deployed instance will stop matching its on-chain verification key.'
+              );
+            }
+
+            if (vk.length > 0) {
+              lines.push('', '| Contract | Verification key |', '| --- | --- |');
+              for (const v of vk) lines.push(`| \`${v.contract}\` | \`${abbrev(v.before)}\` → \`${abbrev(v.after)}\` |`);
+            }
+
+            const rows = (r.rowChanges ?? []).filter((x) => !x.withinTolerance);
+            if (rows.length > 0) {
+              lines.push('', '**Constraint counts**', '', '| Method | Rows |', '| --- | --- |');
+              for (const x of rows) {
+                const sign = x.delta > 0 ? '+' : '';
+                lines.push(`| \`${x.contract}.${x.method}()\` | ${x.before} → ${x.after} (${sign}${x.delta}) |`);
+              }
+            }
+
+            const removed = r.removedContracts ?? [];
+            if (removed.length > 0) {
+              lines.push('', '**In the snapshot but not found in the project**', '');
+              for (const x of removed) lines.push(`- \`${x.name}\` (was \`${x.file}\`) — removed, renamed, or discovery is not reaching it`);
+            }
+
+            const added = r.addedContracts ?? [];
+            if (added.length > 0) {
+              lines.push('', '**Not in the snapshot**', '');
+              for (const n of added) lines.push(`- \`${n}\``);
+            }
+
+            lines.push('', `_${r.summary}_`, '', 'If this change is intended, run `vk-guard update` and commit the snapshot.');
+          }
+
+          const marker = '<!-- vk-guard-report -->';
+          const body = `${marker}\n### vk-guard\n\n${lines.join('\n')}`;
+
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          const existing = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+          const mine = existing.find((c) => c.body && c.body.includes(marker));
+
+          if (mine) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }
+
+    - name: Fail on drift
+      if: ${{ inputs.fail-on-drift == 'true' && steps.check.outputs.drift == 'true' }}
+      shell: bash
+      run: |
+        echo "::error::vk-guard detected drift. ${{ steps.check.outputs.summary }}"
+        exit 1

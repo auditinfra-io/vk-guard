@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+test/.tmp/
+.vk-guard-cache/
+*.tsbuildinfo
+.DS_Store
