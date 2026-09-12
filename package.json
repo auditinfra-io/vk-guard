@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "tinyglobby": "^0.2.10",
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
