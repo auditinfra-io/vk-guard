@@ -5,6 +5,14 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Fixed
+
+- The release workflow no longer triggers on both `release: published` and `push: tags`.
+  Cutting a GitHub Release creates the tag as well, so both fired and two runs raced to
+  publish the same version, one of them failing on "cannot publish over the previously
+  published version". Releases are now the only trigger, and a `concurrency` group
+  prevents two runs for the same ref from overlapping regardless.
+
 ## [0.1.0] - 2026-09-12
 
 First release.

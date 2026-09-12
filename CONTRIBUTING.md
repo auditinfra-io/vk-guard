@@ -43,7 +43,11 @@ Releases publish to npm automatically, the same way o1js-scan does:
 2. Cut a GitHub Release for tag `vX.Y.Z`.
 
 Publishing the release runs `.github/workflows/release.yml`, which authenticates with the
-`NPM_TOKEN` repository secret. Pushing a `vX.Y.Z` tag directly works too.
+`NPM_TOKEN` repository secret.
+
+Publishing a Release is the only trigger. Pushing a bare tag does not publish: cutting a
+Release creates the tag too, so a `push: tags` trigger would fire a second, duplicate run
+racing the first to publish the same version.
 
 `NPM_TOKEN` must be an npm **Automation** token (or a granular token with "Bypass
 two-factor authentication" enabled for publish). A classic read-write token without 2FA
