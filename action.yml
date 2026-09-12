@@ -31,9 +31,9 @@ inputs:
     required: false
     default: '20'
   version:
-    description: 'vk-guard version to install from npm. Override only to test another release. Ignored when source is "action".'
+    description: 'vk-guard version to install from npm. Defaults to the version in this action checkout. Override only to test another release. Ignored when source is "action".'
     required: false
-    default: '0.1.0'
+    default: ''
   source:
     description: 'Where to install vk-guard from: "npm" (the published release named by `version`), or "action" to build it from this action checkout. Use "action" to pin to a git ref, or while the package is not yet published to npm.'
     required: false
@@ -149,9 +149,11 @@ runs:
         case "$SOURCE" in
           npm)
             if [ -z "$VK_GUARD_VERSION" ]; then
-              echo "::error::version must not be empty when source is 'npm'; pin the vk-guard release to execute"
-              exit 1
+              # Keep the Action and npm package in lockstep without a second
+              # version literal for release automation to remember to bump.
+              VK_GUARD_VERSION="$(node -p "require(process.argv[1]).version" "$GITHUB_ACTION_PATH/package.json")"
             fi
+            echo "installing vk-guard $VK_GUARD_VERSION from npm"
             npm install --global "vk-guard@$VK_GUARD_VERSION"
             ;;
           action)

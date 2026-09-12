@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { loadProject } from './project.js';
 import { discover, DEFAULT_ENTRY } from './discover.js';
 import { measure } from './analyze.js';
@@ -8,7 +8,12 @@ import { compare, type Comparison } from './compare.js';
 import { renderComparison, summaryLine } from './report.js';
 import type { Measured, Snapshot } from './types.js';
 
-export const VK_GUARD_VERSION = '0.1.0';
+// package.json is the release source of truth. Keeping another literal here
+// allowed npm releases to report (and write into snapshots) the previous
+// version when the release checklist only bumped package.json.
+export const VK_GUARD_VERSION: string = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+).version;
 
 export type RunOptions = {
   root: string;

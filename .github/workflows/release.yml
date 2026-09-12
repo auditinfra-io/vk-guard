@@ -123,6 +123,12 @@ jobs:
       - name: Verify the package contents
         run: |
           set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          CLI="$(node dist/cli.js --version)"
+          if [ "$CLI" != "$PKG" ]; then
+            echo "::error::built CLI reports $CLI but package.json says $PKG"
+            exit 1
+          fi
           npm pack --dry-run
           # examples/ and test/ must never ship; the bin must.
           TARBALL="$(npm pack --silent | tail -1)"
