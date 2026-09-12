@@ -1,5 +1,9 @@
 # vk-guard
 
+[![CI](https://github.com/auditinfra-io/vk-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/auditinfra-io/vk-guard/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/vk-guard)](https://www.npmjs.com/package/vk-guard)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Verification-key and constraint-count regression guard for [o1js](https://github.com/o1-labs/o1js) zkApps.**
 
 Changing a circuit changes its verification key. A changed verification key no longer
@@ -37,6 +41,8 @@ Constraint count changed:
 ```
 
 ## Install
+
+Requires Node.js 20 or newer and an o1js project.
 
 ```bash
 npm install --save-dev vk-guard
@@ -215,9 +221,9 @@ vk-guard defaults these on if your config is silent about them.
 
 ### o1js versions
 
-Developed and verified against **o1js 3.0.0**. The peer range is `>=1.0.0 <4.0.0`,
-covering the versions whose `analyzeMethods()` / `compile()` / `digest()` surface matches
-what vk-guard uses; if you hit a mismatch on an older release, please open an issue.
+Developed and verified against **o1js 3.0.0**. The peer range is `>=3.0.0 <4.0.0`.
+Major o1js releases can change the compiler API, so they are enabled only after explicit
+compatibility testing rather than being assumed compatible.
 
 Note that `verificationKey.hash` is an o1js `Field`, not a string — vk-guard stores its
 decimal `toString()` form, which is what you see in the snapshot.
@@ -242,6 +248,10 @@ jobs:
 Inputs: `working-directory`, `entry`, `rows-only`, `cache-dir`, `snapshot`,
 `node-version`, `version`, `install`, `install-command`, `cache`, `comment-on-pr`,
 `fail-on-drift`. Outputs: `drift`, `summary`, `json-file`.
+
+The Action pins its default npm package version to the version released with the Action,
+so a tagged workflow cannot silently begin executing a newer package. Set `version`
+explicitly when evaluating another release.
 
 The Action caches o1js compile artifacts across runs, keyed on the o1js version and the
 lockfile hash, and posts (and updates) a single pull request comment summarizing drift.
@@ -269,6 +279,17 @@ For soundness analysis of o1js circuits — under-constrained witnesses and simi
 see **[o1js-scan](https://github.com/auditinfra-io/o1js-scan)**, a static analyzer that
 runs in milliseconds with no dependencies. The two are complements: o1js-scan asks whether
 your circuit is *correct*; vk-guard asks whether it *changed*.
+
+## Project status and support
+
+vk-guard is an independent community project and is not affiliated with or endorsed by
+o1Labs. Treat a baseline update like any other security-relevant code change: review it
+and keep it version-controlled.
+
+- See [CONTRIBUTING.md](CONTRIBUTING.md) to develop and test changes.
+- Report bugs and compatibility issues through GitHub Issues.
+- Report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md).
+- User-visible changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

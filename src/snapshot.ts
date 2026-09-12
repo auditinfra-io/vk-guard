@@ -74,14 +74,74 @@ function validateSnapshot(parsed: unknown, path: string): Snapshot {
   if (typeof o.o1jsVersion !== 'string') {
     throw new Error(`${path} is missing "o1jsVersion". Regenerate it with \`vk-guard update\`.`);
   }
-  if (typeof o.contracts !== 'object' || o.contracts === null) {
+  if (!isRecord(o.contracts)) {
     throw new Error(`${path} is missing "contracts". Regenerate it with \`vk-guard update\`.`);
   }
+  const contracts: Record<string, ContractEntry> = {};
+  for (const [name, value] of Object.entries(o.contracts)) {
+    contracts[name] = validateContract(value, path, name);
+  }
+  const config = validateConfig(o.config, path);
   return {
     vkGuardVersion: typeof o.vkGuardVersion === 'string' ? o.vkGuardVersion : '0.0.0',
     o1jsVersion: o.o1jsVersion,
     rowsOnly: o.rowsOnly === true,
-    config: (o.config as Snapshot['config']) ?? undefined,
-    contracts: o.contracts as Record<string, ContractEntry>,
+    config,
+    contracts,
   };
+}
+
+function validateContract(value: unknown, path: string, name: string): ContractEntry {
+  if (!isRecord(value)) invalid(path, `contract "${name}" must be an object`);
+  if (typeof value.file !== 'string') invalid(path, `contract "${name}" is missing a string "file"`);
+  if (value.kind !== 'SmartContract' && value.kind !== 'ZkProgram') {
+    invalid(path, `contract "${name}" has an invalid "kind"`);
+  }
+  if (!isRecord(value.methods)) invalid(path, `contract "${name}" is missing "methods"`);
+
+  const methods: Record<string, MethodEntry> = {};
+  for (const [method, entry] of Object.entries(value.methods)) {
+    if (!isRecord(entry) || !Number.isSafeInteger(entry.rows) || (entry.rows as number) < 0) {
+      invalid(path, `method "${name}.${method}" must have a non-negative integer "rows"`);
+    }
+    if (entry.digest !== undefined && typeof entry.digest !== 'string') {
+      invalid(path, `method "${name}.${method}" has a non-string "digest"`);
+    }
+    methods[method] = { rows: entry.rows as number, ...(entry.digest === undefined ? {} : { digest: entry.digest as string }) };
+  }
+  for (const key of ['verificationKeyHash', 'digest'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') {
+      invalid(path, `contract "${name}" has a non-string "${key}"`);
+    }
+  }
+  return {
+    file: value.file as string,
+    kind: value.kind as ContractEntry['kind'],
+    methods,
+    ...(value.verificationKeyHash === undefined ? {} : { verificationKeyHash: value.verificationKeyHash as string }),
+    ...(value.digest === undefined ? {} : { digest: value.digest as string }),
+  };
+}
+
+function validateConfig(value: unknown, path: string): Snapshot['config'] {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) invalid(path, '"config" must be an object');
+  if (value.rowTolerance === undefined) return {};
+  if (!isRecord(value.rowTolerance)) invalid(path, '"config.rowTolerance" must be an object');
+  const rowTolerance: Record<string, number> = {};
+  for (const [key, tolerance] of Object.entries(value.rowTolerance)) {
+    if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {
+      invalid(path, `row tolerance "${key}" must be a non-negative number`);
+    }
+    rowTolerance[key] = tolerance as number;
+  }
+  return { rowTolerance };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function invalid(path: string, message: string): never {
+  throw new Error(`${path}: ${message}. Regenerate it with \`vk-guard update\`.`);
 }

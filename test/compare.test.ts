@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { compare } from '../src/compare.js';
 import { renderComparison, summaryLine } from '../src/report.js';
-import { serializeSnapshot } from '../src/snapshot.js';
+import { readSnapshot, serializeSnapshot } from '../src/snapshot.js';
 import { VK_GUARD_VERSION } from '../src/index.js';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './helpers.js';
 import type { Snapshot, Measured } from '../src/types.js';
@@ -216,6 +216,29 @@ describe('snapshot serialization', () => {
 
   it('never stores verificationKey.data', () => {
     expect(serializeSnapshot(snapshot())).not.toContain('"data"');
+  });
+});
+
+describe('snapshot validation', () => {
+  it('rejects malformed method data with an actionable error', () => {
+    const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-snapshot.json');
+    mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
+    writeFileSync(path, JSON.stringify({
+      o1jsVersion: '3.0.0',
+      contracts: {
+        Counter: { file: 'src/Counter.ts', kind: 'SmartContract', methods: { increment: { rows: -1 } } },
+      },
+    }));
+    expect(() => readSnapshot(path)).toThrow(/Counter\.increment.*non-negative integer.*vk-guard update/);
+  });
+
+  it('rejects invalid row tolerances before comparison', () => {
+    const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-config.json');
+    mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
+    writeFileSync(path, JSON.stringify({
+      o1jsVersion: '3.0.0', config: { rowTolerance: { default: -1 } }, contracts: {},
+    }));
+    expect(() => readSnapshot(path)).toThrow(/row tolerance "default" must be a non-negative number/);
   });
 });
 
