@@ -5,6 +5,12 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Changed
+
+- README reflects that vk-guard is published: plain `npm install --save-dev vk-guard`,
+  and the Action pinned to the `@v0` major alias rather than `@main` with
+  `source: action`. `source` is now documented as the way to run an unreleased commit.
+
 ### Fixed
 
 - The release workflow no longer triggers on both `release: published` and `push: tags`.

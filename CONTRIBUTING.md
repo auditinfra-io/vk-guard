@@ -56,8 +56,10 @@ enabled is required to publish packages`.
 
 If `NPM_TOKEN` is removed, the workflow falls back to npm Trusted Publishing over OIDC,
 which needs a trusted publisher for this repo and `release.yml` registered on npmjs.com.
-That is the better long-term setup — nothing long-lived to leak — but it can only be
-configured for a package that already exists, which is why the token path exists at all.
+That is the better long-term setup — nothing long-lived to leak or rotate. It could not
+be used for 0.1.0, because npm only configures it for a package that already exists, but
+vk-guard is published now, so switching over is a matter of registering the publisher and
+deleting the secret.
 
 There is no PyPI step here. Unlike o1js-scan, vk-guard is a Node/TypeScript package with
 no Python artifact.

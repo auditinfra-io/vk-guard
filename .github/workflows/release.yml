@@ -19,10 +19,13 @@
 #
 # If NPM_TOKEN is unset the job falls back to npm Trusted Publishing via OIDC
 # (`id-token: write`), which needs a trusted publisher for this repo +
-# `release.yml` configured on npmjs.com first, or the upload 401s. Trusted
-# Publishing is the better long-term option — no long-lived token — but it can
-# only be configured for a package that already exists, so the token path is
-# what makes the FIRST publish possible.
+# `release.yml` registered on npmjs.com first, or the upload 401s.
+#
+# Trusted Publishing is the better long-term setup: nothing long-lived to leak
+# or rotate. It could not be used for 0.1.0 because npm only configures it for a
+# package that already exists — but vk-guard is published now, so it CAN be
+# enabled: register the trusted publisher on npmjs.com, then delete the
+# NPM_TOKEN secret and this job switches over on its own.
 #
 # There is no PyPI job here, unlike o1js-scan's publish.yml: vk-guard is a
 # Node/TypeScript package with no Python artifact to build or upload.
