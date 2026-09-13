@@ -152,6 +152,12 @@ export async function run(opts: RunOptions): Promise<RunResult> {
           },
           contractsChecked: measured.length,
           methodsChecked: measured.reduce((n, m) => n + Object.keys(m.methods).length, 0),
+          // `contractsChecked` counts what was measured, which is not the same
+          // as what was compared. These two say where the baseline could not
+          // back a comparison, so a consumer can tell a clean run from a run
+          // that proved nothing for part of the project.
+          verificationKeysNotCompared: comparison.vkNotCompared,
+          circuitDigestsNotCompared: comparison.digestNotCompared,
           verificationKeyChanges: comparison.vkChanges,
           methodDigestChanges: comparison.methodDigestChanges,
           gateTypeChanges: comparison.gateTypeChanges,

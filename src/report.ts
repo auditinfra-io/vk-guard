@@ -24,6 +24,30 @@ function plural(n: number, word: string): string {
 export function renderComparison(c: Comparison, rowsOnly: boolean): string {
   const out: string[] = [];
 
+  // Printed first: a coverage hole outranks any drift found elsewhere in the
+  // same run, because it says part of the run proved nothing.
+  if (c.vkNotCompared.length > 0) {
+    out.push(
+      `No verification key to compare for:\n` +
+        c.vkNotCompared.map((n) => `  ${n}`).join('\n') +
+        `\n\nThe snapshot entry carries no \`verificationKeyHash\`, so this run could not\n` +
+        `check the one thing that breaks deployed zkApps. Every snapshot written by\n` +
+        `\`vk-guard update\` records one, so the field was removed after the fact —\n` +
+        `most often by a merge-conflict resolution in .vk-guard.json.\n` +
+        `Re-record the baseline with \`vk-guard update\`. Reported as a failure and not\n` +
+        `a pass: a missing key is not evidence that the key is unchanged.`
+    );
+  }
+
+  if (c.digestNotCompared.length > 0) {
+    out.push(
+      `No circuit digest to compare for:\n` +
+        c.digestNotCompared.map((d) => `  ${d.contract}.${d.method}()`).join('\n') +
+        `\n\nThe snapshot entry carries no \`digest\` for these methods, so a circuit\n` +
+        `change in them would go undetected. Re-record with \`vk-guard update\`.`
+    );
+  }
+
   if (c.versionChangeExplainsVk) {
     out.push(renderVersionChange(c));
   } else if (c.vkChanges.length > 0) {
