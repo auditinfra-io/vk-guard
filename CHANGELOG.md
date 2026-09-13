@@ -20,6 +20,10 @@ All notable changes to this project will be documented here. This project follow
   change as observed; it reports the circuit-digest observation and recommends a full
   check.
 
+  The composite action's PR comment renders the same result independently, so it carries
+  the same conditional wording and the same `SmartContract`/`ZkProgram` split, and now
+  names each target's kind. It is covered by tests for the first time.
+
 ### Removed
 
 - **Causal inference.** `versionChangeExplainsVk` and the JSON field

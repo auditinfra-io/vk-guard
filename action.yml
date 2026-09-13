@@ -266,6 +266,11 @@ runs:
               // snapshots cannot separate application edits from dependency,
               // SDK or build configuration changes.
               const compared = obs.comparedVerificationKeys ?? vk.length;
+              // A ZkProgram has no deployed account of its own, so account and
+              // permission language does not apply to it. Mirrors consequenceNote()
+              // in src/report.ts; `kind` is absent in results from older versions,
+              // which are treated as the SmartContract case.
+              const kinds = new Set(vk.map((v) => v.kind));
               lines.push(
                 `**${vk.length} of ${compared} compared verification key${compared === 1 ? '' : 's'} changed.**`,
                 '',
@@ -274,17 +279,35 @@ runs:
                   : `o1js version unchanged (${r.o1js?.current}).`,
                 obs.methodDigestsChanged ? 'Method circuit digests also changed.' : '',
                 'This comparison does not determine the cause.',
-                '',
-                'If an account still holds a previous key, proofs from the changed circuit will not',
-                'verify against it. Applying the change may require an authorized verification-key',
-                'update or a redeployment, depending on account permissions. vk-guard reads no chain',
-                'state and cannot confirm what is deployed.'
+                ''
+              );
+              if (kinds.has('SmartContract') || kinds.has(undefined)) {
+                lines.push(
+                  'If an account still holds a previous key, proofs from the changed circuit will not',
+                  'verify against it. Applying the change may require an authorized verification-key',
+                  'update or a redeployment, depending on account permissions.'
+                );
+              }
+              if (kinds.has('ZkProgram')) {
+                lines.push(
+                  'For a ZkProgram, anything pinning a previous key will not verify proofs from the',
+                  'changed program. A ZkProgram has no deployed account of its own.'
+                );
+              }
+              lines.push(
+                'vk-guard reads no chain state and cannot confirm what is deployed. Accepting a new',
+                'baseline records the new key locally; it does not change any key on-chain.'
               );
             }
 
+            // Kind is shown per row so a mixed result stays readable: the
+            // consequence text above covers both cases, and only this table says
+            // which target is which.
             if (vk.length > 0) {
-              lines.push('', '| Contract | Verification key |', '| --- | --- |');
-              for (const v of vk) lines.push(`| \`${v.contract}\` | \`${abbrev(v.before)}\` → \`${abbrev(v.after)}\` |`);
+              lines.push('', '| Target | Kind | Verification key |', '| --- | --- | --- |');
+              for (const v of vk) {
+                lines.push(`| \`${v.contract}\` | ${v.kind ?? 'unknown'} | \`${abbrev(v.before)}\` → \`${abbrev(v.after)}\` |`);
+              }
             }
 
             const rows = (r.rowChanges ?? []).filter((x) => !x.withinTolerance);
