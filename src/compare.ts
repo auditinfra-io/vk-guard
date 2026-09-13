@@ -20,6 +20,13 @@ function own<T>(record: Record<string, T> | undefined, key: string): T | undefin
 
 export type VkChange = { contract: string; before: string; after: string };
 export type DigestChange = { contract: string; method: string };
+/** Which gate types moved for one method, and by how much. */
+export type GateTypeChange = {
+  contract: string;
+  method: string;
+  deltas: { type: string; before: number; after: number; delta: number }[];
+};
+
 export type RowChange = {
   contract: string;
   method: string;
@@ -46,6 +53,12 @@ export type Comparison = {
   /** Contracts whose VK was compared and found unchanged. */
   vkUnchanged: string[];
   methodDigestChanges: DigestChange[];
+  /**
+   * Structural detail behind the digest changes: which gate types grew or shrank.
+   * Reports WHAT changed in the circuit, never why — attributing a gate to a line
+   * of source is not something o1js's data supports.
+   */
+  gateTypeChanges: GateTypeChange[];
   rowChanges: RowChange[];
   addedContracts: string[];
   /** Snapshot entries with no matching contract in the working tree. */
@@ -75,6 +88,7 @@ export function compare(
     vkChanges: [],
     vkUnchanged: [],
     methodDigestChanges: [],
+    gateTypeChanges: [],
     rowChanges: [],
     addedContracts: [],
     removedContracts: [],
@@ -125,6 +139,11 @@ export function compare(
       // row-count finding, but it must never make a changed circuit look clean.
       if (before.digest && cur.digest && before.digest !== cur.digest) {
         c.methodDigestChanges.push({ contract: m.name, method });
+
+        const deltas = gateTypeDeltas(before.gateTypes, cur.gateTypes);
+        if (deltas.length > 0) {
+          c.gateTypeChanges.push({ contract: m.name, method, deltas });
+        }
       }
 
       if (before.rows !== cur.rows) {
@@ -174,4 +193,25 @@ function toleranceFor(config: SnapshotConfig, contract: string, method: string):
   const t = config.rowTolerance;
   if (!t) return 0;
   return own(t, `${contract}.${method}`) ?? own(t, contract) ?? own(t, 'default') ?? 0;
+}
+
+/**
+ * Gate-type deltas between two histograms. Absent on either side means the
+ * snapshot predates histograms, in which case there is nothing to compare and we
+ * say nothing rather than reporting every type as newly appeared.
+ */
+function gateTypeDeltas(
+  before: Record<string, number> | undefined,
+  after: Record<string, number> | undefined
+): GateTypeChange['deltas'] {
+  if (!before || !after) return [];
+  const types = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return [...types]
+    .map((type) => {
+      const b = own(before, type) ?? 0;
+      const a = own(after, type) ?? 0;
+      return { type, before: b, after: a, delta: a - b };
+    })
+    .filter((d) => d.delta !== 0)
+    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta) || x.type.localeCompare(y.type));
 }

@@ -12,6 +12,17 @@ export type MethodEntry = {
    * real check rather than a rubber stamp.
    */
   digest?: string;
+  /**
+   * How many gates of each type the method compiles to, e.g.
+   * `{ "Poseidon": 550, "Zero": 50, "Generic": 15 }`.
+   *
+   * The full constraint system is hundreds of gate objects per method and has no
+   * place in a committed file, but its type histogram is a handful of integers.
+   * Storing it is what lets a drift report say WHAT changed structurally — "11
+   * more Poseidon rows", which is one more hash — instead of only that a number
+   * moved. Comes from `analyzeMethods()`, so `--rows-only` records it too.
+   */
+  gateTypes?: Record<string, number>;
 };
 
 export type ContractEntry = {

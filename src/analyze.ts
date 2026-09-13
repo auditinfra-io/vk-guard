@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type { ProjectContext } from './project.js';
 import type { Discovered } from './discover.js';
 import type { Measured } from './types.js';
+import type { RawGate } from './discover.js';
 
 export type MeasureOptions = {
   rowsOnly: boolean;
@@ -46,7 +47,7 @@ export async function measure(
     const methods = Object.fromEntries(
       Object.entries(analysis).map(([methodName, info]) => [
         methodName,
-        { rows: info.rows, digest: info.digest },
+        { rows: info.rows, digest: info.digest, ...gateTypesOf(info.gates) },
       ])
     );
 
@@ -97,4 +98,19 @@ function makeCache(ctx: ProjectContext, cacheDir: string | undefined): unknown {
   if (!Cache) return undefined;
   const dir = cacheDir ?? defaultCacheDir(ctx.root, ctx.o1jsVersion);
   return Cache.FileSystem(dir);
+}
+
+/**
+ * Count gates by type. Returns nothing when o1js did not supply gates, so the
+ * snapshot simply omits the field rather than recording a misleading empty
+ * histogram that would later read as "this circuit has no gates".
+ */
+function gateTypesOf(gates: RawGate[] | undefined): { gateTypes?: Record<string, number> } {
+  if (!gates || gates.length === 0) return {};
+  const counts: Record<string, number> = {};
+  for (const g of gates) counts[g.type] = (counts[g.type] ?? 0) + 1;
+  const sorted = Object.fromEntries(
+    Object.entries(counts).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+  );
+  return { gateTypes: sorted };
 }

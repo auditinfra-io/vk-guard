@@ -189,10 +189,15 @@ directory by o1js version (`.vk-guard-cache/o1js-<version>/`), which removes the
 remaining way a stale artifact could be reused — an o1js upgrade that changed key
 derivation without changing the circuit hash — while keeping the speedup.
 
-**Determinism was verified before anything was built on it.** Compiling the same unchanged
-contract in three separate processes (cold cache, warm cache, and `forceRecompile: true`)
-produced an identical verification key hash every time. A comment-only and formatting-only
-edit also leaves the key unmoved.
+**Determinism was verified before anything was built on it**, and both claims above
+are reproducible rather than asserted:
+
+```bash
+npm run experiments
+```
+
+Each script exits non-zero if its property does not hold, so they double as a
+platform check. See [`experiments/`](experiments/) for the method and full results.
 
 ## Requirements
 
@@ -280,6 +285,48 @@ lockfile hash, and posts (and updates) a single pull request comment summarizing
 `--rows-only` still catches any circuit change via the method digests. What it cannot do
 is tell you the new verification key hash.
 
+## Where did my rows go?
+
+A row count tells you a circuit is expensive. It does not tell you why. `vk-guard
+explain` reports what the constraint system is actually made of:
+
+```bash
+npx vk-guard explain
+```
+
+```
+Counter.increment()   615 rows
+  Poseidon        550   89.4%  █████████████████████···
+  Zero             50    8.1%  ██······················
+  Generic          15    2.4%  █·······················
+
+  structure:
+    Poseidon     50 x 11 rows       550 rows  89.4%
+
+  wire locality: 99.5% of wires stay within 16 rows
+```
+
+`Counter.increment()` is one field addition, yet it compiles to 615 rows — and
+**89% of them are Poseidon gates from the framework's state commitment, not from
+your arithmetic**. The `structure` line makes that concrete: one Poseidon hash costs
+11 rows, so this method performs fifty of them before your code does anything.
+
+That reframes the optimisation question. Shaving your own logic cannot touch the
+550 rows; reducing the number of state fields you commit to can.
+
+Like `--rows-only`, `explain` uses `analyzeMethods()` and never calls `compile()`,
+so it runs in seconds.
+
+### What it does not do
+
+o1js attaches **no source location to gates** — a gate carries its type, its wire
+permutation and its coefficients, and nothing else. So vk-guard cannot tell you
+which line of TypeScript produced which gate, and it does not guess. It reports
+which gate types occupy which row ranges, which is the part the data supports.
+
+Witness values are likewise not exposed per gate, and are secret by nature, so
+there is no witness inspection here either.
+
 ## vk-guard guards itself
 
 [`examples/counter`](examples/counter) is a small but real zkApp — a `SmartContract` and a
@@ -291,6 +338,14 @@ upgrade announces itself here first.
 ```bash
 npm run example:check
 ```
+
+## Design notes
+
+[`docs/DESIGN.md`](docs/DESIGN.md) records why the tool is built this way and what
+had to be discovered about o1js to build it — gates carrying no source location,
+the `emitDecoratorMetadata` requirement that rules out esbuild-based loaders, the
+dual CJS/ESM entry points that break `instanceof`, and the content-addressed cache.
+Most of it is not in o1js's documentation.
 
 ## Scope
 

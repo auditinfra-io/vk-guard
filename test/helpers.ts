@@ -8,11 +8,19 @@ export const TMP_ROOT = join(REPO_ROOT, 'test', '.tmp');
 export const CLI = join(REPO_ROOT, 'dist', 'cli.js');
 
 /**
- * A shared o1js compile cache across the whole suite. Safe to share because we
- * verified the cache is content-addressed on the circuit: a changed method
- * produces a different key, so one test cannot poison another's result.
+ * A shared o1js compile cache across the whole suite.
+ *
+ * Safe to share because the cache is content-addressed on the circuit (see
+ * experiments/cache-correctness.ts): a changed method produces a different key,
+ * so one test cannot poison another's result.
+ *
+ * Deliberately NOT under TMP_ROOT. Temp projects are wiped between runs, and
+ * when this lived alongside them every run deleted its own cache and recompiled
+ * every circuit from cold — the single largest cost in the suite. Keeping it in
+ * node_modules/.cache makes repeat runs reuse compiled artifacts while staying
+ * out of git and out of the published package.
  */
-export const SHARED_CACHE = join(TMP_ROOT, 'o1js-cache');
+export const SHARED_CACHE = join(REPO_ROOT, 'node_modules', '.cache', 'vk-guard-test-o1js');
 
 const TSCONFIG = {
   compilerOptions: {

@@ -10,11 +10,21 @@
       "methods": {
         "increment": {
           "rows": 615,
-          "digest": "b36e671c87cf5043980baa22bb2daaec"
+          "digest": "b36e671c87cf5043980baa22bb2daaec",
+          "gateTypes": {
+            "Poseidon": 550,
+            "Zero": 50,
+            "Generic": 15
+          }
         },
         "reset": {
           "rows": 626,
-          "digest": "94b89320f7403f9d8df1c0f8165e76c4"
+          "digest": "94b89320f7403f9d8df1c0f8165e76c4",
+          "gateTypes": {
+            "Poseidon": 561,
+            "Zero": 51,
+            "Generic": 14
+          }
         }
       }
     },
@@ -26,7 +36,12 @@
       "methods": {
         "step": {
           "rows": 13,
-          "digest": "f4820f163c85110f1a3ae4819556c24e"
+          "digest": "f4820f163c85110f1a3ae4819556c24e",
+          "gateTypes": {
+            "Poseidon": 11,
+            "Generic": 1,
+            "Zero": 1
+          }
         }
       }
     }

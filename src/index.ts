@@ -6,6 +6,7 @@ import { measure } from './analyze.js';
 import { readSnapshot, writeSnapshot, snapshotExists, SNAPSHOT_FILE } from './snapshot.js';
 import { compare, type Comparison } from './compare.js';
 import { renderComparison, summaryLine } from './report.js';
+import { summarizeGates, renderComposition, type GateComposition } from './explain.js';
 import type { Measured, Snapshot } from './types.js';
 
 // package.json is the release source of truth. Keeping another literal here
@@ -153,6 +154,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
           methodsChecked: measured.reduce((n, m) => n + Object.keys(m.methods).length, 0),
           verificationKeyChanges: comparison.vkChanges,
           methodDigestChanges: comparison.methodDigestChanges,
+          gateTypeChanges: comparison.gateTypeChanges,
           rowChanges: comparison.rowChanges,
           addedContracts: comparison.addedContracts,
           removedContracts: comparison.removedContracts,
@@ -173,6 +175,115 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   return { exitCode: comparison.failed ? 1 : 0, summary, comparison, measured, output };
 }
 
+export type ExplainOptions = {
+  root: string;
+  entry?: string[];
+  tsconfig?: string;
+  json?: boolean;
+  onProgress?: (message: string) => void;
+};
+
+export type ExplainResult = {
+  exitCode: number;
+  output: string;
+  compositions: { contract: string; method: string; composition: GateComposition }[];
+};
+
+/**
+ * Report what each method's constraint system is actually made of.
+ *
+ * Uses `analyzeMethods()` only — no `compile()` — so it runs in seconds. o1js
+ * attaches no source location to gates, so this reports the composition of the
+ * circuit (which gate types, in which row ranges), never a claim about which
+ * line of TypeScript produced them.
+ */
+export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
+  const root = resolve(opts.root);
+  const cacheRoot = join(root, '.vk-guard-cache');
+  const ctx = await loadProject(root, cacheRoot);
+
+  const buildDir = join(cacheRoot, 'build');
+  rmSync(buildDir, { recursive: true, force: true });
+
+  const { contracts, scannedFiles } = await discover(ctx, {
+    root,
+    entry: opts.entry,
+    tsconfig: opts.tsconfig,
+    buildDir,
+  });
+
+  // Same rule as `check`: finding nothing is a failure, never a quiet success.
+  if (contracts.length === 0) {
+    const patterns = (opts.entry?.length ? opts.entry : DEFAULT_ENTRY).join(', ');
+    return {
+      exitCode: 1,
+      compositions: [],
+      output:
+        `no contracts found; check --entry\n\n` +
+        `Searched ${scannedFiles} file(s) matching: ${patterns}`,
+    };
+  }
+
+  const compositions: ExplainResult['compositions'] = [];
+  const missingGates: string[] = [];
+
+  for (const d of contracts) {
+    opts.onProgress?.(`analyzing ${d.name}`);
+    const analysis = await d.target.analyzeMethods();
+    for (const [method, info] of Object.entries(analysis)) {
+      if (!info.gates) {
+        // Never silently present an empty circuit as a real result.
+        missingGates.push(`${d.name}.${method}()`);
+        continue;
+      }
+      compositions.push({
+        contract: d.name,
+        method,
+        composition: summarizeGates(info.gates, info.rows),
+      });
+    }
+  }
+
+  if (compositions.length === 0) {
+    return {
+      exitCode: 1,
+      compositions: [],
+      output:
+        `this o1js version did not expose gate data for any method, so there is ` +
+        `nothing to explain.\nAffected: ${missingGates.join(', ')}`,
+    };
+  }
+
+  if (opts.json) {
+    return {
+      exitCode: 0,
+      compositions,
+      output: JSON.stringify(
+        { o1jsVersion: ctx.o1jsVersion, methods: compositions, methodsWithoutGates: missingGates },
+        null,
+        2
+      ),
+    };
+  }
+
+  const body = compositions
+    .map((c) => renderComposition(`${c.contract}.${c.method}()`, c.composition))
+    .join('\n\n');
+
+  const totalRows = compositions.reduce((n, c) => n + c.composition.rows, 0);
+  const note =
+    missingGates.length > 0
+      ? `\n\nNo gate data for: ${missingGates.join(', ')}`
+      : '';
+
+  return {
+    exitCode: 0,
+    compositions,
+    output:
+      `${body}\n\n${compositions.length} method(s), ${totalRows} rows total, o1js ${ctx.o1jsVersion}${note}`,
+  };
+}
+
 function stripName(m: Measured) {
   const { name, ...entry } = m;
   void name;
@@ -190,3 +301,5 @@ function safeRead(path: string): Snapshot | undefined {
 export { compare, readSnapshot, writeSnapshot, serializeSnapshot } from './exports.js';
 export type { Snapshot, Measured, ContractEntry, MethodEntry } from './types.js';
 export type { Comparison } from './compare.js';
+export { summarizeGates, diffComposition, renderComposition } from './explain.js';
+export type { GateComposition, TypeShare, GateBlock, TypeDelta } from './explain.js';

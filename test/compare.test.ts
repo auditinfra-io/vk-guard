@@ -386,3 +386,89 @@ describe('names that collide with Object.prototype', () => {
     expect(c.failed).toBe(true);
   });
 });
+
+describe('gate type changes', () => {
+  const withGates = (
+    rows: number,
+    digest: string,
+    gateTypes: Record<string, number>
+  ) => ({
+    file: 'src/C.ts',
+    kind: 'SmartContract' as const,
+    verificationKeyHash: 'k',
+    methods: { m: { rows, digest, gateTypes } },
+  });
+
+  function snapWith(gateTypes: Record<string, number>, rows = 615, digest = 'd1'): Snapshot {
+    return {
+      vkGuardVersion: '0.1.0',
+      o1jsVersion: '3.0.0',
+      contracts: { C: withGates(rows, digest, gateTypes) },
+    };
+  }
+  function measuredWith(gateTypes: Record<string, number>, rows = 626, digest = 'd2'): Measured[] {
+    return [{ name: 'C', ...withGates(rows, digest, gateTypes) }];
+  }
+
+  // Adding one Poseidon hash costs 11 rows. The report should say that in gate
+  // terms, not merely that a number moved.
+  it('reports which gate types grew and shrank', () => {
+    const c = compare(
+      snapWith({ Poseidon: 550, Zero: 50, Generic: 15 }),
+      measuredWith({ Poseidon: 561, Zero: 51, Generic: 14 }),
+      '3.0.0',
+      true
+    );
+    expect(c.gateTypeChanges).toEqual([
+      {
+        contract: 'C',
+        method: 'm',
+        deltas: [
+          { type: 'Poseidon', before: 550, after: 561, delta: 11 },
+          { type: 'Generic', before: 15, after: 14, delta: -1 },
+          { type: 'Zero', before: 50, after: 51, delta: 1 },
+        ],
+      },
+    ]);
+    expect(renderComparison(c, true)).toContain('Poseidon        550 -> 561');
+  });
+
+  it('says nothing when the snapshot predates gate histograms', () => {
+    const snap: Snapshot = {
+      vkGuardVersion: '0.1.0',
+      o1jsVersion: '3.0.0',
+      contracts: {
+        C: {
+          file: 'src/C.ts',
+          kind: 'SmartContract',
+          verificationKeyHash: 'k',
+          methods: { m: { rows: 615, digest: 'd1' } },
+        },
+      },
+    };
+    const c = compare(snap, measuredWith({ Poseidon: 561 }), '3.0.0', true);
+    expect(c.methodDigestChanges).toHaveLength(1);
+    // No histogram to compare against, so no claim is made either way.
+    expect(c.gateTypeChanges).toEqual([]);
+    expect(renderComparison(c, true)).not.toContain('Gate types that moved');
+  });
+
+  it('does not report gate changes when the circuit is unchanged', () => {
+    const same = { Poseidon: 550, Generic: 15 };
+    const c = compare(snapWith(same), measuredWith(same, 615, 'd1'), '3.0.0', true);
+    expect(c.gateTypeChanges).toEqual([]);
+    expect(c.failed).toBe(false);
+  });
+
+  it('reports a gate type appearing for the first time', () => {
+    const c = compare(
+      snapWith({ Generic: 10 }),
+      measuredWith({ Generic: 10, Rot64: 8 }),
+      '3.0.0',
+      true
+    );
+    expect(c.gateTypeChanges[0]!.deltas).toEqual([
+      { type: 'Rot64', before: 0, after: 8, delta: 8 },
+    ]);
+  });
+});

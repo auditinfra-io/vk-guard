@@ -5,3 +5,5 @@ test/.tmp/
 .vk-guard-cache/
 *.tsbuildinfo
 .DS_Store
+experiments/.build/
+experiments/.cache-*/
