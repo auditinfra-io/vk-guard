@@ -5,6 +5,14 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Fixed
+
+- `VK_GUARD_VERSION` is read from `package.json` at runtime instead of being a second
+  literal, so a release that bumped only the manifest can no longer publish a CLI that
+  reports the previous version or writes it into snapshots. The release workflow now also
+  refuses to publish when the built CLI and `package.json` disagree, and the Action
+  derives its default npm version from the pinned checkout rather than a hardcoded one.
+
 ### Changed
 
 - README reflects that vk-guard is published: plain `npm install --save-dev vk-guard`,
