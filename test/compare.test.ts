@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { compare } from '../src/compare.js';
 import { renderComparison, summaryLine } from '../src/report.js';
 import { readSnapshot, serializeSnapshot } from '../src/snapshot.js';
-import { VK_GUARD_VERSION } from '../src/index.js';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './helpers.js';
 import type { Snapshot, Measured } from '../src/types.js';
@@ -270,15 +269,6 @@ describe('summary line', () => {
 
   it('marks the rows-only fast path', () => {
     expect(summaryLine(measured(), '2.4.0', true)).toContain('rows-only');
-  });
-});
-
-describe('package metadata', () => {
-  // The snapshot records vkGuardVersion; a drifting constant would misattribute
-  // which version of the tool produced a baseline.
-  it('keeps VK_GUARD_VERSION in sync with package.json', () => {
-    const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
-    expect(VK_GUARD_VERSION).toBe(pkg.version);
   });
 });
 

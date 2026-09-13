@@ -7,6 +7,28 @@ All notable changes to this project will be documented here. This project follow
 
 ### Changed
 
+- Bumped the pinned GitHub Actions to their current majors: `actions/checkout` v4 -> v7,
+  `actions/setup-node` v4 -> v7, `actions/cache` v4 -> v6, `actions/github-script`
+  v7 -> v9. GitHub is deprecating the Node 20 action runtime and was already forcing the
+  v4 actions onto Node 24, so this was overdue.
+
+  **Compatibility:** `action.yml` is published surface, so this raises the action-runtime
+  floor for every consumer of `auditinfra-io/vk-guard`. Hosted runners are unaffected.
+  Self-hosted runners too old to provide the Node 24 action runtime must be updated, or
+  pinned to `auditinfra-io/vk-guard@v0.1.0`, which keeps the v4 actions. Dependabot still
+  holds majors for these four so the next bump is also a deliberate, noted change rather
+  than an automated PR.
+
+### Fixed
+
+- `VK_GUARD_VERSION` is read from `package.json` at runtime instead of being a second
+  literal, so a release that bumped only the manifest can no longer publish a CLI that
+  reports the previous version or writes it into snapshots. The release workflow now also
+  refuses to publish when the built CLI and `package.json` disagree, and the Action
+  derives its default npm version from the pinned checkout rather than a hardcoded one.
+
+### Changed
+
 - README reflects that vk-guard is published: plain `npm install --save-dev vk-guard`,
   and the Action pinned to the `@v0` major alias rather than `@main` with
   `source: action`. `source` is now documented as the way to run an unreleased commit.

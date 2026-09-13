@@ -241,7 +241,7 @@ jobs:
       contents: read
       pull-requests: write   # only needed for comment-on-pr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: auditinfra-io/vk-guard@v0
 ```
 
