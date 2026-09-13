@@ -45,29 +45,12 @@ describe('compare', () => {
     expect(c.comparedMethods).toBe(2);
   });
 
-  // Case 5: the single most valuable distinction the tool makes.
-  it('uses the distinct version-change message when o1js moved and all VKs moved', () => {
-    const c = compare(snapshot({ o1jsVersion: '2.3.0' }), measured({ verificationKeyHash: '999' }), '2.4.0', false);
-    expect(c.o1jsChanged).toBe(true);
-    expect(c.versionChangeExplainsVk).toBe(true);
+  // The comparison reports observations. It cannot separate application edits
+  // from dependency, SDK or build configuration changes, so none of these may
+  // assert a cause.
+  const NO_CAUSE = /does not determine the cause/;
 
-    const text = renderComparison(c, false);
-    expect(text).toContain('o1js 2.3.0 -> 2.4.0');
-    expect(text).toContain('must be redeployed');
-    // It must NOT read as an ordinary regression in the user's own code.
-    expect(text).not.toContain('follows from a change in your own code');
-  });
-
-  it('uses the ordinary regression message when o1js is unchanged', () => {
-    const c = compare(snapshot(), measured({ verificationKeyHash: '999' }), '2.3.0', false);
-    expect(c.versionChangeExplainsVk).toBe(false);
-
-    const text = renderComparison(c, false);
-    expect(text).toContain('follows from a change in your own code');
-    expect(text).not.toContain('-> 2.4.0');
-  });
-
-  it('does not blame the version when some VKs held steady', () => {
+  function withSecond(hash: string) {
     const snap = snapshot();
     snap.contracts.Other = {
       file: 'src/Other.ts',
@@ -81,17 +64,40 @@ describe('compare', () => {
         name: 'Other',
         file: 'src/Other.ts',
         kind: 'SmartContract' as const,
-        verificationKeyHash: '222',
+        verificationKeyHash: hash,
         methods: { go: { rows: 10, digest: 'x' } },
       },
     ];
-    const c = compare(snap, m, '2.4.0', false);
+    return { snap, m };
+  }
+
+  it('SDK version changed, all measured keys changed: states both, claims neither caused the other', () => {
+    const c = compare(snapshot({ o1jsVersion: '2.3.0' }), measured({ verificationKeyHash: '999' }), '2.4.0', false);
     expect(c.o1jsChanged).toBe(true);
-    expect(c.versionChangeExplainsVk).toBe(false);
-    expect(renderComparison(c, false)).toContain('does not explain this');
+    expect(c.allComparedKeysChanged).toBe(true);
+
+    const text = renderComparison(c, false);
+    expect(text).toContain('o1js version changed: 2.3.0 -> 2.4.0');
+    expect(text).toMatch(NO_CAUSE);
+    // No attribution in either direction.
+    expect(text).not.toMatch(/as a result|caused|because of|explain/i);
+    expect(text).not.toMatch(/must be redeployed|will stop matching/i);
   });
 
-  it('notes when circuits changed alongside an o1js upgrade', () => {
+  it('SDK version changed, only some keys changed: does not treat unchanged keys as exculpating', () => {
+    const { snap, m } = withSecond('222');
+    const c = compare(snap, m, '2.4.0', false);
+    expect(c.o1jsChanged).toBe(true);
+    expect(c.allComparedKeysChanged).toBe(false);
+    expect(c.vkUnchanged).toEqual(['Other']);
+
+    const text = renderComparison(c, false);
+    expect(text).toContain('1 of 2 compared verification keys changed');
+    expect(text).toMatch(NO_CAUSE);
+    expect(text).not.toMatch(/does not explain|cannot explain/i);
+  });
+
+  it('SDK version changed and method digests changed: reports both as observations', () => {
     const c = compare(
       snapshot(),
       measured({
@@ -101,9 +107,63 @@ describe('compare', () => {
       '2.4.0',
       false
     );
-    expect(c.versionChangeExplainsVk).toBe(true);
-    expect(c.circuitsAlsoChanged).toBe(true);
-    expect(renderComparison(c, false)).toContain('not purely the upgrade');
+    expect(c.methodDigestsChanged).toBe(true);
+
+    const text = renderComparison(c, false);
+    expect(text).toContain('Method circuit digests also changed');
+    expect(text).toMatch(NO_CAUSE);
+    // Must not infer that the user edited source.
+    expect(text).not.toMatch(/your own|edits are contributing|not purely the upgrade/i);
+  });
+
+  it('SDK version unchanged but keys changed: does not conclude the source changed', () => {
+    const c = compare(snapshot(), measured({ verificationKeyHash: '999' }), '2.3.0', false);
+    expect(c.o1jsChanged).toBe(false);
+
+    const text = renderComparison(c, false);
+    expect(text).toContain('o1js version unchanged (2.3.0)');
+    expect(text).toMatch(NO_CAUSE);
+    expect(text).not.toMatch(/follows from a change in your own code|your own code/i);
+  });
+
+  it('missing key measurements alongside changed keys: uncompared is not counted as unchanged', () => {
+    const { snap, m } = withSecond('222');
+    delete (m[1] as { verificationKeyHash?: string }).verificationKeyHash;
+    const c = compare(snap, m, '2.3.0', false);
+
+    expect(c.vkChanges).toHaveLength(1);
+    expect(c.vkNotCompared).toEqual(['Other']);
+    expect(c.vkUnchanged).toEqual([]);
+    // One key compared, and it changed. The uncompared one is excluded rather
+    // than silently treated as unchanged.
+    expect(c.allComparedKeysChanged).toBe(true);
+    expect(c.failed).toBe(true);
+    expect(renderComparison(c, false)).toContain('1 key could not be compared');
+  });
+
+  it('zero comparable keys: makes no all-changed claim', () => {
+    const snap = snapshot();
+    delete snap.contracts.MyContract!.verificationKeyHash;
+    const m = measured();
+    delete (m[0] as { verificationKeyHash?: string }).verificationKeyHash;
+
+    const c = compare(snap, m, '2.3.0', false);
+    expect(c.vkChanges).toEqual([]);
+    expect(c.vkUnchanged).toEqual([]);
+    // Requires at least one real comparison, so this stays false.
+    expect(c.allComparedKeysChanged).toBe(false);
+    expect(c.vkNotCompared).toEqual(['MyContract']);
+    expect(c.failed).toBe(true);
+  });
+
+  it('distinguishes a ZkProgram from a SmartContract in the consequence note', () => {
+    const snap = snapshot();
+    snap.contracts.MyContract!.kind = 'ZkProgram';
+    const m = measured({ kind: 'ZkProgram', verificationKeyHash: '999' });
+    const text = renderComparison(compare(snap, m, '2.3.0', false), false);
+
+    expect(text).toContain('ZkProgram has no deployed account of its own');
+    expect(text).not.toContain('depending on account permissions');
   });
 });
 
@@ -335,7 +395,8 @@ describe('names that collide with Object.prototype', () => {
       ];
       const c = compare(snap, m, '3.0.0', false);
       expect(c.comparedContracts).toBe(1);
-      expect(c.vkChanges).toEqual([{ contract: name, before: 'BEFORE', after: 'AFTER' }]);
+      expect(c.vkChanges).toHaveLength(1);
+      expect(c.vkChanges[0]).toMatchObject({ contract: name, before: 'BEFORE', after: 'AFTER' });
       expect(c.failed).toBe(true);
     });
   }
@@ -556,5 +617,47 @@ describe('a baseline field that is absent cannot read as unchanged', () => {
     const c = compare(snapshot(), m, '2.3.0', true);
     expect(c.vkNotCompared).toEqual([]);
     expect(c.failed).toBe(false);
+  });
+});
+
+describe('duplicate names at the compare() boundary', () => {
+  // compare() is exported, so a programmatic caller can reach it without going
+  // through discovery. The snapshot is keyed by name, so duplicates must be
+  // rejected here too rather than silently collapsing.
+  const dupe = (name: string, hash: string): Measured => ({
+    name,
+    file: `src/${hash}.ts`,
+    kind: 'SmartContract',
+    verificationKeyHash: hash,
+    methods: { m: { rows: 1, digest: 'd' } },
+  });
+
+  it('throws, naming the conflict and its files', () => {
+    expect(() => compare(snapshot(), [dupe('Dup', 'a'), dupe('Dup', 'b')], '2.3.0', false)).toThrow(
+      /duplicate target names/i
+    );
+    try {
+      compare(snapshot(), [dupe('Dup', 'a'), dupe('Dup', 'b')], '2.3.0', false);
+    } catch (e) {
+      expect((e as Error).message).toContain('Dup');
+      expect((e as Error).message).toContain('src/a.ts');
+      expect((e as Error).message).toContain('src/b.ts');
+    }
+  });
+
+  it('throws even when the duplicates measured identically', () => {
+    const a = dupe('Dup', 'same');
+    const b = { ...a, file: 'src/other.ts' };
+    expect(() => compare(snapshot(), [a, b], '2.3.0', false)).toThrow(/duplicate target names/i);
+  });
+
+  it('rejects a name that collides with Object.prototype too', () => {
+    expect(() =>
+      compare(snapshot(), [dupe('toString', 'a'), dupe('toString', 'b')], '2.3.0', false)
+    ).toThrow(/duplicate target names/i);
+  });
+
+  it('accepts distinct names', () => {
+    expect(() => compare(snapshot(), [dupe('A', 'a'), dupe('B', 'b')], '2.3.0', false)).not.toThrow();
   });
 });

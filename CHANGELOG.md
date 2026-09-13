@@ -5,7 +5,51 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Changed
+
+- **Deployment-impact language is now conditional.** Output no longer asserts that a key
+  difference breaks every deployed instance or universally requires redeployment. It
+  reports the measured fact — the newly compiled key differs from the committed baseline
+  — and states the consequences conditionally: if an account still holds a previous key,
+  proofs from the changed circuit will not verify against it, and applying the change may
+  require an authorized verification-key update or a redeployment depending on account
+  permissions. vk-guard reads no chain state and cannot confirm deployment status;
+  accepting a new baseline records a key locally and changes nothing on-chain.
+  `ZkProgram` results are distinguished from `SmartContract` results, since a ZkProgram
+  has no deployed account of its own. `--rows-only` no longer presents an unmeasured key
+  change as observed; it reports the circuit-digest observation and recommends a full
+  check.
+
+  The composite action's PR comment renders the same result independently, so it carries
+  the same conditional wording and the same `SmartContract`/`ZkProgram` split, and now
+  names each target's kind. It is covered by tests for the first time.
+
+### Removed
+
+- **Causal inference.** `versionChangeExplainsVk` and the JSON field
+  `o1js.explainsVerificationKeyChanges` are removed rather than renamed. Comparing two
+  snapshots cannot separate application edits from dependency, SDK or build configuration
+  changes, so these claims were not supportable. Four specific inferences are gone: that
+  an upgrade caused the drift when all keys moved; that unchanged keys exonerate an
+  upgrade; that digest changes during an upgrade prove a source edit; and that an
+  unchanged o1js version proves the source changed.
+
+  Replaced by observations. `circuitsAlsoChanged` is renamed `methodDigestsChanged`, and
+  `allComparedKeysChanged` states only that every key which was actually compared
+  differed — it requires at least one real comparison and excludes keys in
+  `vkNotCompared`, so an uncompared key is never counted as unchanged. JSON gains an
+  `observations` block carrying these counts plus `causeDetermined: false`.
+
 ### Fixed
+
+- **Duplicate target names are rejected before measurement.** A snapshot is keyed by
+  target name alone, so two distinct targets sharing a name silently overwrote each
+  other, leaving one unguarded while the run still reported success. Discovery now fails
+  with each conflicting name and its source files, before any compile and before a
+  snapshot is written, so a failed `update` leaves an existing baseline byte-for-byte
+  unchanged. Object-identity deduplication is preserved, so re-exporting one target from
+  several files remains valid. `compare()` validates the same invariant, because it is
+  exported and a programmatic caller can bypass discovery.
 
 - A snapshot entry missing its `verificationKeyHash` no longer passes silently. Both
   fields are optional in the schema but every snapshot `vk-guard update` writes carries

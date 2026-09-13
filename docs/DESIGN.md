@@ -6,11 +6,16 @@ reading its type definitions and by measurement.
 
 ## The problem
 
-Changing a circuit changes its verification key. A changed verification key no
-longer matches the one stored on-chain, so every already-deployed instance of
-that zkApp breaks and must be redeployed. The o1js CHANGELOG documents this
-repeatedly — group operation changes, a VK-hash fix, and a `Provable.if()`
-rewrite were each described as breaking deployed contracts.
+Changing a circuit changes its verification key. If an account is deployed
+holding the previous key, proofs generated for the changed circuit will not
+verify against it, and applying the change may require an authorized
+verification-key update or a redeployment, depending on account permissions. The
+o1js CHANGELOG documents circuit-level changes of this kind repeatedly — group
+operation changes, a VK-hash fix, and a `Provable.if()` rewrite.
+
+vk-guard measures locally and reads no chain state, so it reports the key
+difference and the conditional consequences, never a claim about what is
+currently deployed.
 
 o1Labs runs verification-key regression tests for o1js itself, in
 [`tests/vk-regression/`](https://github.com/o1-labs/o1js/tree/main/tests/vk-regression).

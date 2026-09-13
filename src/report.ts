@@ -48,10 +48,8 @@ export function renderComparison(c: Comparison, rowsOnly: boolean): string {
     );
   }
 
-  if (c.versionChangeExplainsVk) {
-    out.push(renderVersionChange(c));
-  } else if (c.vkChanges.length > 0) {
-    out.push(renderOrdinaryVkDrift(c));
+  if (c.vkChanges.length > 0) {
+    out.push(renderVkChanges(c));
   }
 
   if (c.methodDigestChanges.length > 0) {
@@ -59,9 +57,9 @@ export function renderComparison(c: Comparison, rowsOnly: boolean): string {
     out.push(
       `Circuit changed (method digest differs) in:\n${lines.join('\n')}\n` +
         (rowsOnly
-          ? `The verification key for these contracts will have changed too.\n` +
-            `Re-run without --rows-only to see the new key hashes.`
-          : `This is the constraint-level evidence behind the key changes above.`)
+          ? `--rows-only does not compile, so no verification key was measured in this\n` +
+            `run. Run a full check to measure whether the keys differ.`
+          : `This is the constraint-level evidence behind the key differences above.`)
     );
   }
 
@@ -123,38 +121,71 @@ export function renderComparison(c: Comparison, rowsOnly: boolean): string {
   return out.join('\n\n');
 }
 
-function renderVersionChange(c: Comparison): string {
-  const n = c.vkChanges.length;
-  // When circuits moved too, the upgrade is not the only cause in play. Saying
-  // so keeps the tool from talking a user out of reviewing their own diff.
-  const caveat = c.circuitsAlsoChanged
-    ? `\n\nNote: method circuits changed as well (see digests below), so your own\n` +
-      `edits are contributing too — this is not purely the upgrade.`
-    : '';
-  return (
-    `o1js ${c.o1jsBefore} -> ${c.o1jsAfter}\n` +
-    `All ${plural(n, 'verification key')} changed as a result.\n` +
-    `Deployed zkApps compiled with the previous version will no longer\n` +
-    `match on-chain verification keys and must be redeployed.\n\n` +
-    c.vkChanges.map((v) => `  ${v.contract}   vk ${abbrev(v.before)} -> ${abbrev(v.after)}`).join('\n') +
-    caveat
-  );
+/**
+ * Report verification key differences as observations.
+ *
+ * Deliberately makes no causal claim. A comparison of two snapshots cannot
+ * distinguish an application edit from a dependency, SDK or build configuration
+ * change, so the o1js version and the digest state are reported as facts
+ * alongside the key differences rather than as an explanation for them.
+ *
+ * The consequence wording is conditional for the same reason: vk-guard reads no
+ * chain state, so it cannot know whether anything is deployed, which key an
+ * account holds, or whether permissions allow a key update.
+ */
+function renderVkChanges(c: Comparison): string {
+  const changed = c.vkChanges.length;
+  const compared = changed + c.vkUnchanged.length;
+
+  const facts = [
+    `${changed} of ${plural(compared, 'compared verification key')} changed` +
+      (c.vkUnchanged.length > 0 ? ` (${c.vkUnchanged.length} unchanged).` : '.'),
+  ];
+  if (c.vkNotCompared.length > 0) {
+    facts.push(`${plural(c.vkNotCompared.length, 'key')} could not be compared.`);
+  }
+  if (c.o1jsChanged) facts.push(`o1js version changed: ${c.o1jsBefore} -> ${c.o1jsAfter}.`);
+  else facts.push(`o1js version unchanged (${c.o1jsAfter}).`);
+  if (c.methodDigestsChanged) facts.push('Method circuit digests also changed.');
+  facts.push('This comparison does not determine the cause.');
+
+  const list = c.vkChanges
+    .map((v) => {
+      const kind = v.kind ? `  (${v.kind})` : '';
+      return `  ${v.contract}   vk ${abbrev(v.before)} -> ${abbrev(v.after)}${kind}`;
+    })
+    .join('\n');
+
+  return `${facts.join('\n')}\n\n${list}\n\n${consequenceNote(c)}`;
 }
 
-function renderOrdinaryVkDrift(c: Comparison): string {
-  const n = c.vkChanges.length;
-  const versionNote = c.o1jsChanged
-    ? `o1js also changed (${c.o1jsBefore} -> ${c.o1jsAfter}), but ${plural(c.vkUnchanged.length, 'key')} ` +
-      `did not move,\nso the upgrade alone does not explain this.\n\n`
-    : `o1js is unchanged (${c.o1jsAfter}), so this follows from a change in your own code.\n\n`;
-  return (
-    `${plural(n, 'verification key')} changed.\n` +
-    versionNote +
-    c.vkChanges.map((v) => `  ${v.contract}   vk ${abbrev(v.before)} -> ${abbrev(v.after)}`).join('\n') +
-    `\n\nAny already-deployed instance of ${n === 1 ? 'this contract' : 'these contracts'} will stop matching\n` +
-    `its on-chain verification key. If this change is intended, redeploy and run\n` +
-    `\`vk-guard update\` to accept the new baseline.`
+/**
+ * What a key difference may imply, stated conditionally. Kept short here; the
+ * README carries the full explanation.
+ */
+function consequenceNote(c: Comparison): string {
+  const kinds = new Set(c.vkChanges.map((v) => v.kind));
+  const lines: string[] = [];
+
+  if (kinds.has('SmartContract') || kinds.has(undefined)) {
+    lines.push(
+      'If an account still holds a previous key, proofs from the changed circuit will',
+      'not verify against it. Applying the change may require an authorized',
+      'verification-key update or a redeployment, depending on account permissions.'
+    );
+  }
+  if (kinds.has('ZkProgram')) {
+    lines.push(
+      'For a ZkProgram, anything pinning a previous key will not verify proofs from',
+      'the changed program. A ZkProgram has no deployed account of its own.'
+    );
+  }
+  lines.push(
+    'vk-guard reads no chain state and cannot confirm what is deployed. Accepting a',
+    'new baseline with `vk-guard update` records the new key locally; it does not',
+    'change any key on-chain. See README, "What a verification key change means".'
   );
+  return lines.join('\n');
 }
 
 function renderRow(r: RowLike): string {
