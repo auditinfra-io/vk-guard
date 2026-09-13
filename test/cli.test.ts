@@ -48,11 +48,15 @@ describe('a changed method body', () => {
 
     const check = runCli(dir, ['check']);
     expect(check.code, check.all).toBe(1);
-    expect(check.stdout).toContain('verification key changed');
+    expect(check.stdout).toMatch(/compared verification keys? changed/);
     expect(check.stdout).toContain('Counter');
     expect(check.stdout).toContain('Counter.increment()');
-    // o1js did not move, so this must read as the user's own edit.
-    expect(check.stdout).toContain('follows from a change in your own code');
+    // The o1js version is reported as a fact, not as an exoneration, and the
+    // unchanged version must not be turned into a claim about the source.
+    expect(check.stdout).toContain('o1js version unchanged');
+    expect(check.stdout).toContain('does not determine the cause');
+    expect(check.stdout).not.toMatch(/your own code|must be redeployed/i);
+    // A failed check never rewrites the baseline.
     expect(readSnap(dir).contracts.Counter.verificationKeyHash).toBe(before);
   });
 });
@@ -241,8 +245,8 @@ describe('--json', () => {
 // Installing two o1js versions side by side is impractical in a test, so the
 // snapshot is rewritten to describe a prior version whose keys differed —
 // which is exactly the state a real upgrade leaves behind.
-describe('snapshot recorded under a different o1js version', () => {
-  it('gives the version-change message, not the ordinary drift message', () => {
+describe('a snapshot recorded under a different o1js version', () => {
+  it('reports the version change and the key difference without attributing one to the other', () => {
     const dir = makeProject('version-change', { 'src/Counter.ts': COUNTER });
     expect(runCli(dir, ['update']).code).toBe(0);
 
@@ -254,40 +258,116 @@ describe('snapshot recorded under a different o1js version', () => {
 
     const check = runCli(dir, ['check']);
     expect(check.code, check.all).toBe(1);
-    expect(check.stdout).toContain(`o1js 0.0.1-previous -> ${realVersion}`);
-    expect(check.stdout).toContain('must be redeployed');
-    // Crucially, it must NOT read as a regression in the user's own code.
-    expect(check.stdout).not.toContain('follows from a change in your own code');
-    // Circuits did not move, so it must not hedge about the user's edits either.
-    expect(check.stdout).not.toContain('not purely the upgrade');
+
+    // Both facts are reported.
+    expect(check.stdout).toContain(`o1js version changed: 0.0.1-previous -> ${realVersion}`);
+    expect(check.stdout).toContain('verification key');
+    // Neither is presented as the cause of the other.
+    expect(check.stdout).toContain('does not determine the cause');
+    expect(check.stdout).not.toMatch(/as a result|must be redeployed|will stop matching/i);
+    expect(check.stdout).not.toMatch(/follows from a change in your own code/i);
+
+    // Conditional consequences, not asserted deployment breakage.
+    expect(check.stdout).toContain('If an account still holds a previous key');
+    expect(check.stdout).toContain('reads no chain state');
   });
+});
 
-  it('still blames the code when o1js moved but some keys held steady', () => {
-    const dir = makeProject('version-change-partial', {
-      'src/Counter.ts': COUNTER,
-      'src/Other.ts': `import { SmartContract, state, State, method, Field } from 'o1js';
+describe('duplicate target names', () => {
+  // Two distinct classes that both end up named "Counter". A snapshot is keyed
+  // by name, so without rejection one would overwrite the other and the
+  // overwritten contract would be silently unguarded.
+  const DUPE_A = `import { SmartContract, state, State, method, Field } from 'o1js';
 
-export class Other extends SmartContract {
-  @state(Field) v = State<Field>();
-
-  @method async touch(x: Field) {
-    this.v.set(this.v.getAndRequireEquals().add(x));
+export class Counter extends SmartContract {
+  @state(Field) count = State<Field>();
+  @method async a(by: Field) {
+    this.count.set(this.count.getAndRequireEquals().add(by));
   }
 }
+`;
+  const DUPE_B = `import { SmartContract, state, State, method, Field } from 'o1js';
+
+export class Counter extends SmartContract {
+  @state(Field) total = State<Field>();
+  @method async b(by: Field) {
+    this.total.set(this.total.getAndRequireEquals().mul(by));
+  }
+}
+`;
+
+  it('fails check, naming each conflict and its files', () => {
+    const dir = makeProject('dupe-check', { 'src/A.ts': DUPE_A, 'src/B.ts': DUPE_B });
+    const res = runCli(dir, ['check', '--rows-only']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.all).toContain('duplicate target name');
+    expect(res.all).toContain('Counter');
+    expect(res.all).toContain('src/A.ts');
+    expect(res.all).toContain('src/B.ts');
+    expect(res.all).toMatch(/unique name|--entry/);
+  });
+
+  it('fails update and leaves an existing baseline byte-for-byte unchanged', () => {
+    const dir = makeProject('dupe-update', { 'src/A.ts': DUPE_A });
+    expect(runCli(dir, ['update', '--rows-only']).code).toBe(0);
+
+    const snapshotPath = join(dir, '.vk-guard.json');
+    const before = readFileSync(snapshotPath);
+
+    writeFileSync(join(dir, 'src/B.ts'), DUPE_B);
+    const res = runCli(dir, ['update', '--rows-only']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.all).toContain('duplicate target name');
+
+    // Byte-for-byte, not merely parse-equal.
+    expect(readFileSync(snapshotPath).equals(before)).toBe(true);
+  });
+
+  it('rejects a SmartContract and a ZkProgram sharing a name', () => {
+    const dir = makeProject('dupe-kinds', {
+      'src/A.ts': DUPE_A,
+      'src/P.ts': `import { ZkProgram, Field } from 'o1js';
+
+export const Counter = ZkProgram({
+  name: 'Counter',
+  publicInput: Field,
+  methods: { go: { privateInputs: [], async method(x: Field) { x.assertEquals(x); } } },
+});
 `,
     });
-    expect(runCli(dir, ['update']).code).toBe(0);
+    const res = runCli(dir, ['check', '--rows-only']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.all).toContain('duplicate target name');
+  });
 
-    // Only one key is stale; the other still matches the working tree.
-    const snap = readSnap(dir);
-    snap.o1jsVersion = '0.0.1-previous';
-    snap.contracts.Counter.verificationKeyHash = '999';
-    writeFileSync(join(dir, '.vk-guard.json'), JSON.stringify(snap, null, 2));
+  it('identical measurements do not make duplicate names acceptable', () => {
+    // Byte-identical circuits, so every measured value would agree. The names
+    // still collide in the snapshot, so this must still fail.
+    const dir = makeProject('dupe-identical', { 'src/A.ts': DUPE_A, 'src/A2.ts': DUPE_A });
+    const res = runCli(dir, ['check', '--rows-only']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.all).toContain('duplicate target name');
+  });
 
-    const check = runCli(dir, ['check']);
-    expect(check.code, check.all).toBe(1);
-    expect(check.stdout).toContain('does not explain this');
-    expect(check.stdout).not.toContain('All 1 verification key changed as a result');
+  it('re-exporting the same target from several files is not a duplicate', () => {
+    const dir = makeProject('re-export', {
+      'src/Counter.ts': COUNTER,
+      'src/index.ts': `export { Counter } from './Counter.js';\n`,
+    });
+    const res = runCli(dir, ['update', '--rows-only']);
+    expect(res.code, res.all).toBe(0);
+    // Discovered once, by object identity.
+    expect(res.stdout).toMatch(/1 contract, /);
+  });
+
+  it('distinct uniquely named targets still work', () => {
+    const dir = makeProject('unique-names', {
+      'src/A.ts': DUPE_A,
+      'src/B.ts': DUPE_B.replace('class Counter', 'class Totals'),
+    });
+    const res = runCli(dir, ['update', '--rows-only']);
+    expect(res.code, res.all).toBe(0);
+    expect(res.stdout).toMatch(/2 contracts, /);
   });
 });
 

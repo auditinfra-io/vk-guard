@@ -18,7 +18,17 @@ function own<T>(record: Record<string, T> | undefined, key: string): T | undefin
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
-export type VkChange = { contract: string; before: string; after: string };
+export type VkChange = {
+  contract: string;
+  /**
+   * Recorded so the report can distinguish a SmartContract, which may have a
+   * deployed account holding a key, from a ZkProgram, which does not have an
+   * account of its own — its key matters to whatever verifies its proofs.
+   */
+  kind?: 'SmartContract' | 'ZkProgram';
+  before: string;
+  after: string;
+};
 export type DigestChange = { contract: string; method: string };
 /** Which gate types moved for one method, and by how much. */
 export type GateTypeChange = {
@@ -41,14 +51,19 @@ export type Comparison = {
   o1jsBefore: string;
   o1jsAfter: string;
   o1jsChanged: boolean;
-  /** True when the o1js version moved AND that is the plausible cause of VK drift. */
-  versionChangeExplainsVk: boolean;
   /**
-   * True when method circuits themselves changed. A pure o1js upgrade can move
-   * verification keys while leaving circuits identical; if digests moved too,
-   * the source changed as well and the upgrade is not the whole story.
+   * Every verification key that was actually compared differed.
+   *
+   * Purely observational, and deliberately independent of `o1jsChanged`. A
+   * comparison of two snapshots cannot tell whether drift came from application
+   * edits, a dependency or SDK change, or build configuration, so no field here
+   * encodes a cause. Requires at least one real comparison: contracts in
+   * `vkNotCompared` are excluded, because a key that was never compared is not
+   * evidence of anything.
    */
-  circuitsAlsoChanged: boolean;
+  allComparedKeysChanged: boolean;
+  /** Observational: at least one method's circuit digest differed. */
+  methodDigestsChanged: boolean;
   vkChanges: VkChange[];
   /** Contracts whose VK was compared and found unchanged. */
   vkUnchanged: string[];
@@ -91,6 +106,8 @@ export function compare(
   currentO1jsVersion: string,
   rowsOnly: boolean
 ): Comparison {
+  assertUniqueNames(measured);
+
   const config: SnapshotConfig = snapshot.config ?? {};
   const byName = new Map(measured.map((m) => [m.name, m]));
 
@@ -98,8 +115,8 @@ export function compare(
     o1jsBefore: snapshot.o1jsVersion,
     o1jsAfter: currentO1jsVersion,
     o1jsChanged: snapshot.o1jsVersion !== currentO1jsVersion,
-    versionChangeExplainsVk: false,
-    circuitsAlsoChanged: false,
+    allComparedKeysChanged: false,
+    methodDigestsChanged: false,
     vkChanges: [],
     vkUnchanged: [],
     vkNotCompared: [],
@@ -131,7 +148,8 @@ export function compare(
     c.comparedContracts++;
 
     // Verification keys are always compared exactly. No tolerance applies here:
-    // any change to a VK breaks every already-deployed instance of the contract.
+    // a key either matches the baseline or it does not, and the consequences of a
+    // mismatch depend on deployment state vk-guard cannot see.
     //
     // Three outcomes, not two. Folding "could not compare" into the silent
     // else-branch is what let a changed key pass: `vkChanges` and `vkUnchanged`
@@ -142,6 +160,7 @@ export function compare(
       } else if (prev.verificationKeyHash !== m.verificationKeyHash) {
         c.vkChanges.push({
           contract: m.name,
+          kind: m.kind,
           before: prev.verificationKeyHash,
           after: m.verificationKeyHash,
         });
@@ -194,13 +213,13 @@ export function compare(
     }
   }
 
-  // A version change is offered as the explanation only when the evidence fits:
-  // the version moved and every compared VK moved with it. If some VKs held
-  // steady, the upgrade alone does not account for the drift and the ordinary
-  // regression reading is the honest one.
-  c.versionChangeExplainsVk =
-    c.o1jsChanged && c.vkChanges.length > 0 && c.vkUnchanged.length === 0;
-  c.circuitsAlsoChanged = c.methodDigestChanges.length > 0;
+  // Observations only. Earlier versions inferred that an o1js upgrade "explained"
+  // the drift when every key moved with it, and that unchanged o1js meant the
+  // application source must have changed. Neither follows: a comparison of two
+  // snapshots cannot separate application edits from dependency, SDK or build
+  // configuration changes. Both inferences are gone rather than softened.
+  c.allComparedKeysChanged = c.vkChanges.length > 0 && c.vkUnchanged.length === 0;
+  c.methodDigestsChanged = c.methodDigestChanges.length > 0;
 
   c.failed =
     c.vkChanges.length > 0 ||
@@ -242,4 +261,36 @@ function gateTypeDeltas(
     })
     .filter((d) => d.delta !== 0)
     .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta) || x.type.localeCompare(y.type));
+}
+
+/**
+ * Reject measured targets that share a name.
+ *
+ * The snapshot keys contracts by name alone, so two distinct targets with the
+ * same name would silently collapse into one entry — the second overwriting the
+ * first, leaving a contract unguarded while the run still reported success.
+ * Discovery rejects this earlier and more helpfully; this guard exists because
+ * `compare()` is exported, so a programmatic caller can reach it without going
+ * through discovery at all.
+ */
+function assertUniqueNames(measured: Measured[]): void {
+  // A Map is used rather than a plain object precisely because names like
+  // `toString` are legal here; Map keys carry no prototype.
+  const counts = new Map<string, number>();
+  for (const m of measured) counts.set(m.name, (counts.get(m.name) ?? 0) + 1);
+
+  const duplicated = [...counts.entries()].filter(([, n]) => n > 1).map(([name]) => name);
+  if (duplicated.length === 0) return;
+
+  const detail = duplicated
+    .map((name) => {
+      const files = measured.filter((m) => m.name === name).map((m) => m.file);
+      return `  ${name}  (${files.join(', ')})`;
+    })
+    .join('\n');
+  throw new Error(
+    `duplicate target names passed to compare():\n${detail}\n` +
+      `A snapshot is keyed by name, so these would overwrite each other and leave ` +
+      `a target unguarded. Give each target a unique name.`
+  );
 }

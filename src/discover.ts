@@ -113,7 +113,48 @@ export async function discover(
   }
 
   contracts.sort((a, b) => a.name.localeCompare(b.name));
+  assertUniqueNames(contracts, opts.root);
   return { contracts, scannedFiles: files.length, semanticErrorCount };
+}
+
+/**
+ * Reject distinct targets that share a name.
+ *
+ * A snapshot is keyed by target name alone, so two different targets called the
+ * same thing collapse into one entry: the second silently overwrites the first,
+ * and a contract nobody is guarding still reports as checked. Re-exporting one
+ * target from several files is fine and is already handled by identity
+ * deduplication above — only genuinely distinct objects reach here.
+ *
+ * This throws before any measurement, so a project in this state never pays for
+ * a compile and never writes a snapshot. Renaming a target is a deliberate
+ * decision with consequences for the baseline, so vk-guard refuses rather than
+ * inventing a disambiguated key.
+ */
+function assertUniqueNames(contracts: Discovered[], root: string): void {
+  const byName = new Map<string, Discovered[]>();
+  for (const c of contracts) {
+    const bucket = byName.get(c.name);
+    if (bucket) bucket.push(c);
+    else byName.set(c.name, [c]);
+  }
+
+  const clashes = [...byName.entries()].filter(([, group]) => group.length > 1);
+  if (clashes.length === 0) return;
+
+  const detail = clashes
+    .map(([name, group]) => {
+      const where = group.map((g) => `      ${g.kind.padEnd(13)} ${g.file}`).join('\n');
+      return `  ${name}\n${where}`;
+    })
+    .join('\n');
+
+  throw new Error(
+    `duplicate target ${clashes.length === 1 ? 'name' : 'names'} found in ${root}:\n${detail}\n\n` +
+      `A snapshot is keyed by name, so these would overwrite each other and leave a\n` +
+      `target unguarded. Give each target a unique name, or narrow --entry so only\n` +
+      `one of them is discovered.`
+  );
 }
 
 function classify(

@@ -259,23 +259,26 @@ runs:
             lines.push('vk-guard could not complete the check:', '', '```', r.error, '```');
           } else {
             const vk = r.verificationKeyChanges ?? [];
-            if (r.o1js?.explainsVerificationKeyChanges) {
+            const obs = r.observations ?? {};
+            if (vk.length > 0) {
+              // Observations only. This comment must not attribute the drift to
+              // an o1js upgrade, to this PR, or to anything else: comparing two
+              // snapshots cannot separate application edits from dependency,
+              // SDK or build configuration changes.
+              const compared = obs.comparedVerificationKeys ?? vk.length;
               lines.push(
-                `**o1js ${r.o1js.snapshot} → ${r.o1js.current}**`,
-                '',
-                `All ${vk.length} verification key${vk.length === 1 ? '' : 's'} changed as a result.`,
-                'Deployed zkApps compiled with the previous version will no longer match',
-                'on-chain verification keys and **must be redeployed**.'
-              );
-            } else if (vk.length > 0) {
-              lines.push(
-                `**${vk.length} verification key${vk.length === 1 ? '' : 's'} changed.**`,
+                `**${vk.length} of ${compared} compared verification key${compared === 1 ? '' : 's'} changed.**`,
                 '',
                 r.o1js?.changed
-                  ? `o1js also changed (${r.o1js.snapshot} → ${r.o1js.current}), but not every key moved, so the upgrade alone does not explain this.`
-                  : `o1js is unchanged (${r.o1js?.current}), so this follows from a change in this PR.`,
+                  ? `o1js version changed: ${r.o1js.snapshot} → ${r.o1js.current}.`
+                  : `o1js version unchanged (${r.o1js?.current}).`,
+                obs.methodDigestsChanged ? 'Method circuit digests also changed.' : '',
+                'This comparison does not determine the cause.',
                 '',
-                'Any already-deployed instance will stop matching its on-chain verification key.'
+                'If an account still holds a previous key, proofs from the changed circuit will not',
+                'verify against it. Applying the change may require an authorized verification-key',
+                'update or a redeployment, depending on account permissions. vk-guard reads no chain',
+                'state and cannot confirm what is deployed.'
               );
             }
 

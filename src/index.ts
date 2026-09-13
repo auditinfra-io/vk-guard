@@ -148,7 +148,17 @@ export async function run(opts: RunOptions): Promise<RunResult> {
             snapshot: comparison.o1jsBefore,
             current: comparison.o1jsAfter,
             changed: comparison.o1jsChanged,
-            explainsVerificationKeyChanges: comparison.versionChangeExplainsVk,
+          },
+          // Observations, not attributions. `explainsVerificationKeyChanges` was
+          // removed rather than renamed: it asserted that an o1js upgrade caused
+          // the drift, which a snapshot comparison cannot establish.
+          observations: {
+            comparedVerificationKeys: comparison.vkChanges.length + comparison.vkUnchanged.length,
+            verificationKeysChanged: comparison.vkChanges.length,
+            verificationKeysUnchanged: comparison.vkUnchanged.length,
+            allComparedKeysChanged: comparison.allComparedKeysChanged,
+            methodDigestsChanged: comparison.methodDigestsChanged,
+            causeDetermined: false,
           },
           contractsChecked: measured.length,
           methodsChecked: measured.reduce((n, m) => n + Object.keys(m.methods).length, 0),
