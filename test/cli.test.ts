@@ -290,3 +290,52 @@ export class Other extends SmartContract {
     expect(check.stdout).not.toContain('All 1 verification key changed as a result');
   });
 });
+
+describe('explain', () => {
+  it('reports the constraint composition without compiling', () => {
+    const dir = makeProject('explain-basic', { 'src/Counter.ts': COUNTER });
+    // No --cache-dir and no compile: explain uses analyzeMethods() only.
+    const res = runCli(dir, ['explain', '--rows-only']);
+    expect(res.code, res.all).toBe(0);
+
+    expect(res.stdout).toContain('Counter.increment()');
+    expect(res.stdout).toContain('Counter.reset()');
+    expect(res.stdout).toContain('Poseidon');
+    expect(res.stdout).toMatch(/wire locality: \d+\.\d%/);
+    expect(res.stdout).toMatch(/2 method\(s\), \d+ rows total, o1js /);
+  });
+
+  it('emits machine-readable output with --json', () => {
+    const dir = makeProject('explain-json', { 'src/Counter.ts': COUNTER });
+    const res = runCli(dir, ['explain', '--json', '--rows-only']);
+    expect(res.code, res.all).toBe(0);
+
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.o1jsVersion).toMatch(/^\d+\.\d+\.\d+/);
+    const inc = parsed.methods.find(
+      (m: { contract: string; method: string }) => m.method === 'increment'
+    );
+    expect(inc.composition.rows).toBeGreaterThan(0);
+    expect(inc.composition.gateCount).toBeGreaterThan(0);
+
+    // Shares must account for the whole circuit.
+    const total = inc.composition.byType.reduce(
+      (n: number, t: { count: number }) => n + t.count,
+      0
+    );
+    expect(total).toBe(inc.composition.gateCount);
+
+    // A zkApp method is dominated by framework hashing, not user arithmetic.
+    const poseidon = inc.composition.byType.find((t: { type: string }) => t.type === 'Poseidon');
+    expect(poseidon.share).toBeGreaterThan(0.5);
+  });
+
+  it('exits 1 when no contracts are found, like check does', () => {
+    const dir = makeProject('explain-empty', {
+      'src/util.ts': 'export const helper = (a: number) => a + 1;\n',
+    });
+    const res = runCli(dir, ['explain', '--rows-only']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.stdout).toContain('no contracts found');
+  });
+});

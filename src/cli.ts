@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { run, VK_GUARD_VERSION } from './index.js';
+import { run, explain, VK_GUARD_VERSION } from './index.js';
 
 const USAGE = `vk-guard ${VK_GUARD_VERSION} — verification-key and constraint-count regression guard for o1js
 
 Usage:
   vk-guard [check]            compare the project against .vk-guard.json (default)
   vk-guard update             accept the current state as the new baseline
+  vk-guard explain            show what each method's constraint system is made of
 
 Options:
   --rows-only                 skip compile(); use analyzeMethods() only (fast path)
@@ -18,13 +19,17 @@ Options:
   -h, --help                  show this help
   -v, --version               show version
 
+The explain command uses analyzeMethods() only, so it runs in seconds. o1js
+records no source location on gates, so it reports which gate types occupy
+which rows, not which line of TypeScript produced them.
+
 Exit codes:
   0  no drift
   1  drift, no contracts found, or a contract could not be measured
 `;
 
 type Parsed = {
-  mode: 'check' | 'update';
+  mode: 'check' | 'update' | 'explain';
   entry: string[];
   rowsOnly: boolean;
   json: boolean;
@@ -43,7 +48,7 @@ function parseArgs(argv: string[]): Parsed | { help: true } | { version: true } 
     root: process.cwd(),
   };
   let i = 0;
-  if (argv[0] === 'check' || argv[0] === 'update') {
+  if (argv[0] === 'check' || argv[0] === 'update' || argv[0] === 'explain') {
     parsed.mode = argv[0];
     i = 1;
   }
@@ -109,6 +114,18 @@ async function main(): Promise<number> {
   }
 
   try {
+    if (parsed.mode === 'explain') {
+      const result = await explain({
+        root: parsed.root,
+        entry: parsed.entry,
+        tsconfig: parsed.tsconfig,
+        json: parsed.json,
+        onProgress: parsed.json ? undefined : (m) => process.stderr.write(`  ${m}\n`),
+      });
+      process.stdout.write(result.output + '\n');
+      return result.exitCode;
+    }
+
     const result = await run({
       root: parsed.root,
       mode: parsed.mode,

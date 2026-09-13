@@ -280,6 +280,48 @@ lockfile hash, and posts (and updates) a single pull request comment summarizing
 `--rows-only` still catches any circuit change via the method digests. What it cannot do
 is tell you the new verification key hash.
 
+## Where did my rows go?
+
+A row count tells you a circuit is expensive. It does not tell you why. `vk-guard
+explain` reports what the constraint system is actually made of:
+
+```bash
+npx vk-guard explain
+```
+
+```
+Counter.increment()   615 rows
+  Poseidon        550   89.4%  █████████████████████···
+  Zero             50    8.1%  ██······················
+  Generic          15    2.4%  █·······················
+
+  structure:
+    Poseidon     50 x 11 rows       550 rows  89.4%
+
+  wire locality: 99.5% of wires stay within 16 rows
+```
+
+`Counter.increment()` is one field addition, yet it compiles to 615 rows — and
+**89% of them are Poseidon gates from the framework's state commitment, not from
+your arithmetic**. The `structure` line makes that concrete: one Poseidon hash costs
+11 rows, so this method performs fifty of them before your code does anything.
+
+That reframes the optimisation question. Shaving your own logic cannot touch the
+550 rows; reducing the number of state fields you commit to can.
+
+Like `--rows-only`, `explain` uses `analyzeMethods()` and never calls `compile()`,
+so it runs in seconds.
+
+### What it does not do
+
+o1js attaches **no source location to gates** — a gate carries its type, its wire
+permutation and its coefficients, and nothing else. So vk-guard cannot tell you
+which line of TypeScript produced which gate, and it does not guess. It reports
+which gate types occupy which row ranges, which is the part the data supports.
+
+Witness values are likewise not exposed per gate, and are secret by nature, so
+there is no witness inspection here either.
+
 ## vk-guard guards itself
 
 [`examples/counter`](examples/counter) is a small but real zkApp — a `SmartContract` and a

@@ -5,6 +5,22 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Added
+
+- `vk-guard explain`: reports what each method's constraint system is composed of —
+  gate-type shares, repeated structural blocks, and wire locality — using
+  `analyzeMethods()` only, so it runs in seconds without compiling. It exists because a
+  row count is not actionable on its own: the example's `increment()` is a single field
+  addition that compiles to 615 rows, 550 of which are Poseidon gates from the
+  framework's state commitment (fifty hashes at 11 rows each) rather than user
+  arithmetic.
+- `summarizeGates`, `diffComposition` and `renderComposition` are exported from the
+  library for tools that want the same analysis.
+
+  Deliberately absent: source-to-gate mapping and witness inspection. o1js records no
+  source location on gates and does not expose per-gate witness values, so neither can be
+  done faithfully; vk-guard reports the composition the data supports instead of guessing.
+
 ### Changed
 
 - Bumped the pinned GitHub Actions to their current majors: `actions/checkout` v4 -> v7,

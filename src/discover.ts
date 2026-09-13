@@ -21,9 +21,27 @@ export type Discovered = {
  * `SmartContract` (static members) and the object returned by `ZkProgram()`
  * expose these, though their `compile()` option bags differ slightly.
  */
+/**
+ * What o1js reports per method. `gates` is the constraint system itself —
+ * verified against o1js 3.0.0, each gate carries its type, the 7-cell wire
+ * permutation, and its coefficients. It is large (hundreds of entries per
+ * method), so it is read for `explain` and never written to a snapshot.
+ */
+export type MethodAnalysis = {
+  rows: number;
+  digest: string;
+  gates?: RawGate[];
+};
+
+export type RawGate = {
+  type: string;
+  wires: { row: number; col: number }[];
+  coeffs: string[];
+};
+
 export type AnalyzableTarget = {
   name: string;
-  analyzeMethods(): Promise<Record<string, { rows: number; digest: string }>>;
+  analyzeMethods(): Promise<Record<string, MethodAnalysis>>;
   digest(): Promise<string>;
   compile(options?: {
     cache?: unknown;
