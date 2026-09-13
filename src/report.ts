@@ -41,6 +41,22 @@ export function renderComparison(c: Comparison, rowsOnly: boolean): string {
     );
   }
 
+  // Structural detail sits directly under the digest changes it explains: a
+  // reader who sees "the circuit changed" immediately learns in what way.
+  if (c.gateTypeChanges.length > 0) {
+    const lines: string[] = [];
+    for (const g of c.gateTypeChanges) {
+      lines.push(`  ${g.contract}.${g.method}()`);
+      for (const d of g.deltas) {
+        const sign = d.delta > 0 ? '+' : '';
+        lines.push(
+          `    ${d.type.padEnd(12)} ${String(d.before).padStart(6)} -> ${String(d.after).padEnd(6)} (${sign}${d.delta})`
+        );
+      }
+    }
+    out.push(`Gate types that moved:\n${lines.join('\n')}`);
+  }
+
   const failingRows = c.rowChanges.filter((r) => !r.withinTolerance);
   const toleratedRows = c.rowChanges.filter((r) => r.withinTolerance);
 

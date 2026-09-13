@@ -189,10 +189,15 @@ directory by o1js version (`.vk-guard-cache/o1js-<version>/`), which removes the
 remaining way a stale artifact could be reused — an o1js upgrade that changed key
 derivation without changing the circuit hash — while keeping the speedup.
 
-**Determinism was verified before anything was built on it.** Compiling the same unchanged
-contract in three separate processes (cold cache, warm cache, and `forceRecompile: true`)
-produced an identical verification key hash every time. A comment-only and formatting-only
-edit also leaves the key unmoved.
+**Determinism was verified before anything was built on it**, and both claims above
+are reproducible rather than asserted:
+
+```bash
+npm run experiments
+```
+
+Each script exits non-zero if its property does not hold, so they double as a
+platform check. See [`experiments/`](experiments/) for the method and full results.
 
 ## Requirements
 
@@ -333,6 +338,14 @@ upgrade announces itself here first.
 ```bash
 npm run example:check
 ```
+
+## Design notes
+
+[`docs/DESIGN.md`](docs/DESIGN.md) records why the tool is built this way and what
+had to be discovered about o1js to build it — gates carrying no source location,
+the `emitDecoratorMetadata` requirement that rules out esbuild-based loaders, the
+dual CJS/ESM entry points that break `instanceof`, and the content-addressed cache.
+Most of it is not in o1js's documentation.
 
 ## Scope
 

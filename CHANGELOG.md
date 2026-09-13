@@ -7,6 +7,29 @@ All notable changes to this project will be documented here. This project follow
 
 ### Added
 
+- `experiments/`: runnable reproductions of the two claims vk-guard rests on —
+  that o1js compilation is deterministic, and that a warm cache cannot serve a
+  verification key contradicting the source. `npm run experiments` prints the tables
+  published in the README and exits non-zero if either property fails, so it doubles as
+  a platform check.
+- `docs/DESIGN.md`: design rationale and the o1js findings behind it, including gates
+  carrying no source location, the `emitDecoratorMetadata` requirement that rules out
+  esbuild-based loaders, and the dual CJS/ESM entry points that silently break
+  `instanceof`.
+- Snapshots now record a compact gate-type histogram per method, and drift reports show
+  which gate types moved — `Poseidon 550 -> 561 (+11)`, which is one more hash. The full
+  constraint system stays out of the snapshot; the histogram is a handful of integers and
+  the example's complete snapshot is under 1.4 kB.
+
+### Changed
+
+- The suite's shared o1js compile cache moved out of the temp-project tree, which was
+  deleting it on every run and forcing every circuit to recompile from cold. Repeat runs
+  are roughly 172s to 147s. Tests using deliberately different circuits must still
+  compile them, which is the remaining cost.
+
+### Added
+
 - `vk-guard explain`: reports what each method's constraint system is composed of —
   gate-type shares, repeated structural blocks, and wire locality — using
   `analyzeMethods()` only, so it runs in seconds without compiling. It exists because a

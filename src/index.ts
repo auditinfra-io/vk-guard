@@ -154,6 +154,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
           methodsChecked: measured.reduce((n, m) => n + Object.keys(m.methods).length, 0),
           verificationKeyChanges: comparison.vkChanges,
           methodDigestChanges: comparison.methodDigestChanges,
+          gateTypeChanges: comparison.gateTypeChanges,
           rowChanges: comparison.rowChanges,
           addedContracts: comparison.addedContracts,
           removedContracts: comparison.removedContracts,

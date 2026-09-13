@@ -33,6 +33,7 @@ function orderedContract(c: ContractEntry): Record<string, unknown> {
         const entry = c.methods[name]!;
         const ordered: MethodEntry = { rows: entry.rows };
         if (entry.digest !== undefined) ordered.digest = entry.digest;
+        if (entry.gateTypes !== undefined) ordered.gateTypes = entry.gateTypes;
         return [name, ordered];
       })
   );
@@ -108,7 +109,19 @@ function validateContract(value: unknown, path: string, name: string): ContractE
     if (entry.digest !== undefined && typeof entry.digest !== 'string') {
       invalid(path, `method "${name}.${method}" has a non-string "digest"`);
     }
-    return [method, { rows: entry.rows as number, ...(entry.digest === undefined ? {} : { digest: entry.digest as string }) }];
+    if (entry.gateTypes !== undefined && !isRecord(entry.gateTypes)) {
+      invalid(path, `method "${name}.${method}" has a non-object "gateTypes"`);
+    }
+    return [
+      method,
+      {
+        rows: entry.rows as number,
+        ...(entry.digest === undefined ? {} : { digest: entry.digest as string }),
+        ...(entry.gateTypes === undefined
+          ? {}
+          : { gateTypes: entry.gateTypes as Record<string, number> }),
+      },
+    ];
   }));
   for (const key of ['verificationKeyHash', 'digest'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
