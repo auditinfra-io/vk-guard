@@ -3,6 +3,28 @@
 All notable changes to this project will be documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- A snapshot entry missing its `verificationKeyHash` no longer passes silently. Both
+  fields are optional in the schema but every snapshot `vk-guard update` writes carries
+  them, so an absent one means it was removed afterwards — most often by a merge-conflict
+  resolution in `.vk-guard.json`. The contract was still counted in `comparedContracts`
+  while its key was never compared, so a genuinely changed verification key exited 0.
+  Measured, same changed key: with the hash stored `vkChanges=1, failed=true`; with it
+  absent `vkChanges=0, failed=false`. The comparison now has three outcomes rather than
+  two — changed, unchanged, or not compared — because `vkChanges` and `vkUnchanged` both
+  being empty was indistinguishable from a clean run. The same applies to a missing
+  per-method `digest`. Reported as a failure naming the contract and how to fix it: a
+  missing key is not evidence that the key is unchanged. `--rows-only` is unaffected,
+  where skipping the key is the point.
+
+  This is the false pass the `own()` helper already guards against one field over —
+  "a contract that is absent from the snapshot as present-but-blank" — reached by a
+  different route, and a hole in 0.1.0's stated guarantee that *a check never passes
+  because nothing ran*.
+
 ## [0.2.0] - 2026-09-13
 
 ### Added

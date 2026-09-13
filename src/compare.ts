@@ -52,7 +52,22 @@ export type Comparison = {
   vkChanges: VkChange[];
   /** Contracts whose VK was compared and found unchanged. */
   vkUnchanged: string[];
+  /**
+   * Contracts a full check could NOT compare, because one side carried no
+   * verification key hash.
+   *
+   * `verificationKeyHash` is optional in the snapshot schema, so a hand-edit or
+   * a merge-conflict resolution that drops the line leaves an entry that still
+   * looks complete. Without this list the contract is counted in
+   * `comparedContracts`, its key is never compared, and the run passes — the
+   * same false pass `own()` guards against one field over, reached by a
+   * different route. Absence of a key is not evidence that the key is
+   * unchanged, so these fail rather than passing quietly.
+   */
+  vkNotCompared: string[];
   methodDigestChanges: DigestChange[];
+  /** Methods whose circuit digest could not be compared, for the same reason. */
+  digestNotCompared: DigestChange[];
   /**
    * Structural detail behind the digest changes: which gate types grew or shrank.
    * Reports WHAT changed in the circuit, never why — attributing a gate to a line
@@ -87,7 +102,9 @@ export function compare(
     circuitsAlsoChanged: false,
     vkChanges: [],
     vkUnchanged: [],
+    vkNotCompared: [],
     methodDigestChanges: [],
+    digestNotCompared: [],
     gateTypeChanges: [],
     rowChanges: [],
     addedContracts: [],
@@ -115,8 +132,14 @@ export function compare(
 
     // Verification keys are always compared exactly. No tolerance applies here:
     // any change to a VK breaks every already-deployed instance of the contract.
-    if (!rowsOnly && prev.verificationKeyHash && m.verificationKeyHash) {
-      if (prev.verificationKeyHash !== m.verificationKeyHash) {
+    //
+    // Three outcomes, not two. Folding "could not compare" into the silent
+    // else-branch is what let a changed key pass: `vkChanges` and `vkUnchanged`
+    // would both be empty, which is indistinguishable from a clean run.
+    if (!rowsOnly) {
+      if (!prev.verificationKeyHash || !m.verificationKeyHash) {
+        c.vkNotCompared.push(m.name);
+      } else if (prev.verificationKeyHash !== m.verificationKeyHash) {
         c.vkChanges.push({
           contract: m.name,
           before: prev.verificationKeyHash,
@@ -137,7 +160,10 @@ export function compare(
 
       // The circuit digest is exact, like the VK hash. A tolerance may soften a
       // row-count finding, but it must never make a changed circuit look clean.
-      if (before.digest && cur.digest && before.digest !== cur.digest) {
+      // Same three-way split: a missing digest is unknown, not equal.
+      if (!before.digest || !cur.digest) {
+        c.digestNotCompared.push({ contract: m.name, method });
+      } else if (before.digest !== cur.digest) {
         c.methodDigestChanges.push({ contract: m.name, method });
 
         const deltas = gateTypeDeltas(before.gateTypes, cur.gateTypes);
@@ -178,6 +204,8 @@ export function compare(
 
   c.failed =
     c.vkChanges.length > 0 ||
+    c.vkNotCompared.length > 0 ||
+    c.digestNotCompared.length > 0 ||
     c.methodDigestChanges.length > 0 ||
     c.rowChanges.some((r) => !r.withinTolerance) ||
     c.addedContracts.length > 0 ||

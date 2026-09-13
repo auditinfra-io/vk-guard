@@ -115,7 +115,13 @@ describe('row tolerance', () => {
           file: 'src/MyContract.ts',
           kind: 'SmartContract',
           verificationKeyHash: '111',
-          methods: { withdraw: { rows: 3110 } },
+          // Equal digests on both sides: this fixture stands for a normal
+          // project whose row count moved within tolerance. Every snapshot
+          // `vk-guard update` writes carries a per-method digest (see
+          // examples/counter/.vk-guard.json), so leaving them out would make
+          // the fixture also exercise a missing-digest coverage hole — a
+          // different condition, which now fails on its own.
+          methods: { withdraw: { rows: 3110, digest: 'w1' } },
         },
       },
       config: { rowTolerance: { default: 0, 'MyContract.withdraw': 100 } },
@@ -126,7 +132,7 @@ describe('row tolerance', () => {
         file: 'src/MyContract.ts',
         kind: 'SmartContract',
         verificationKeyHash: '111',
-        methods: { withdraw: { rows: 3150 } },
+        methods: { withdraw: { rows: 3150, digest: 'w1' } },
       },
     ];
     const c = compare(snap, m, '2.3.0', false);
@@ -142,7 +148,10 @@ describe('row tolerance', () => {
           file: 'src/MyContract.ts',
           kind: 'SmartContract',
           verificationKeyHash: '111',
-          methods: { withdraw: { rows: 3110 } },
+          // Digests present so this test stays sensitive to the ROW logic:
+          // without them the missing-digest guard would fail the run on its
+          // own, and a broken tolerance would still look caught.
+          methods: { withdraw: { rows: 3110, digest: 'w1' } },
         },
       },
       config: { rowTolerance: { 'MyContract.withdraw': 10 } },
@@ -153,7 +162,7 @@ describe('row tolerance', () => {
         file: 'src/MyContract.ts',
         kind: 'SmartContract',
         verificationKeyHash: '111',
-        methods: { withdraw: { rows: 3500 } },
+        methods: { withdraw: { rows: 3500, digest: 'w1' } },
       },
     ];
     expect(compare(snap, m, '2.3.0', false).failed).toBe(true);
@@ -470,5 +479,82 @@ describe('gate type changes', () => {
     expect(c.gateTypeChanges[0]!.deltas).toEqual([
       { type: 'Rot64', before: 0, after: 8, delta: 8 },
     ]);
+  });
+});
+
+describe('a baseline field that is absent cannot read as unchanged', () => {
+  // `verificationKeyHash` and the per-method `digest` are optional in the
+  // snapshot schema, but every snapshot `vk-guard update` writes carries both.
+  // A field that goes missing afterwards — a merge-conflict resolution in
+  // .vk-guard.json is the likely route — used to leave the comparison silently
+  // skipped while the contract was still counted in `comparedContracts`.
+  //
+  // Measured before this change, with a genuinely changed key:
+  //   VK present in the snapshot -> vkChanges=1  failed=true
+  //   VK absent  from the snapshot -> vkChanges=0  failed=FALSE
+  //
+  // Both runs report `comparedContracts: 1`. This is the same false pass the
+  // `own()` helper guards against one field over, reached by another route.
+
+  function snapshotWithoutVk(): Snapshot {
+    const s = snapshot();
+    delete (s.contracts.MyContract as { verificationKeyHash?: string }).verificationKeyHash;
+    return s;
+  }
+
+  it('fails when the snapshot has no verification key to compare', () => {
+    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    expect(c.vkNotCompared).toEqual(['MyContract']);
+    expect(c.failed).toBe(true);
+  });
+
+  it('does not report the absent key as unchanged', () => {
+    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    expect(c.vkUnchanged).toEqual([]);
+    expect(c.vkChanges).toEqual([]);
+  });
+
+  it('says so in the report, rather than printing a clean run', () => {
+    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    const out = renderComparison(c, false);
+    expect(out).toContain('No verification key to compare');
+    expect(out).toContain('MyContract');
+    expect(out).toContain('vk-guard update');
+  });
+
+  it('still fails when the key would not have changed anyway', () => {
+    // The point is the missing evidence, not the value behind it. A run that
+    // cannot check is not a run that checked and found nothing.
+    const c = compare(snapshotWithoutVk(), measured(), '2.3.0', false);
+    expect(c.vkNotCompared).toEqual(['MyContract']);
+    expect(c.failed).toBe(true);
+  });
+
+  it('fails when a method has no digest to compare', () => {
+    const s = snapshot();
+    delete (s.contracts.MyContract!.methods.withdraw as { digest?: string }).digest;
+    const c = compare(s, measured(), '2.3.0', false);
+    expect(c.digestNotCompared).toEqual([{ contract: 'MyContract', method: 'withdraw' }]);
+    expect(c.failed).toBe(true);
+    expect(renderComparison(c, false)).toContain('No circuit digest to compare');
+  });
+
+  it('leaves a complete snapshot passing exactly as before', () => {
+    const c = compare(snapshot(), measured(), '2.3.0', false);
+    expect(c.vkNotCompared).toEqual([]);
+    expect(c.digestNotCompared).toEqual([]);
+    expect(c.vkUnchanged).toEqual(['MyContract']);
+    expect(c.failed).toBe(false);
+  });
+
+  it('does not fire on --rows-only, where skipping the key is the point', () => {
+    // A rows-only run never measures a key, so "not compared" would be noise on
+    // every contract. The whole-snapshot guard in index.ts already refuses the
+    // dangerous direction: a FULL check against a rows-only snapshot.
+    const m = measured();
+    delete (m[0] as { verificationKeyHash?: string }).verificationKeyHash;
+    const c = compare(snapshot(), m, '2.3.0', true);
+    expect(c.vkNotCompared).toEqual([]);
+    expect(c.failed).toBe(false);
   });
 });
