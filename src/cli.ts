@@ -39,6 +39,35 @@ type Parsed = {
   root: string;
 };
 
+/**
+ * An argument error, carrying whether the help text belongs after it.
+ *
+ * The distinction exists because the same error is rendered two ways: a person
+ * gets the message and, for an unknown option, the usage text; a `--json`
+ * consumer gets the message alone, since a screenful of help inside a JSON
+ * string is not something a machine reads.
+ */
+class ParseError extends Error {
+  readonly usage: boolean;
+  constructor(message: string, usage = false) {
+    super(message);
+    this.usage = usage;
+  }
+}
+
+/**
+ * Whether `--json` was asked for, read straight from the raw arguments.
+ *
+ * Argument parsing can fail before there is a parsed result to consult, and a
+ * failure there is exactly when a CI integration needs a parseable answer: the
+ * composite action redirects stdout to a file, so a parse error that wrote only
+ * to stderr left that file empty, `JSON.parse` threw, and the job failed with no
+ * machine-readable explanation of the misconfiguration that caused it.
+ */
+function wantsJson(argv: string[]): boolean {
+  return argv.includes('--json');
+}
+
 function parseArgs(argv: string[]): Parsed | { help: true } | { version: true } {
   const parsed: Parsed = {
     mode: 'check',
@@ -83,7 +112,7 @@ function parseArgs(argv: string[]): Parsed | { help: true } | { version: true } 
         parsed.root = requireValue(argv, ++i, '--root');
         break;
       default:
-        throw new Error(`unknown option: ${arg}\n\n${USAGE}`);
+        throw new ParseError(`unknown option: ${arg}`, true);
     }
   }
   return parsed;
@@ -91,16 +120,27 @@ function parseArgs(argv: string[]): Parsed | { help: true } | { version: true } 
 
 function requireValue(argv: string[], i: number, flag: string): string {
   const v = argv[i];
-  if (v === undefined || v.startsWith('--')) throw new Error(`${flag} requires a value`);
+  if (v === undefined || v.startsWith('--')) throw new ParseError(`${flag} requires a value`);
   return v;
 }
 
 async function main(): Promise<number> {
+  const argv = process.argv.slice(2);
   let parsed;
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (e) {
-    process.stderr.write(`vk-guard: ${(e as Error).message}\n`);
+    const err = e as Error;
+    // Same rule as every other failure: --json means stdout carries a JSON
+    // object, whatever went wrong. A misconfigured invocation is a result too.
+    if (wantsJson(argv)) {
+      process.stdout.write(
+        JSON.stringify({ ok: false, reason: 'bad-arguments', error: err.message }, null, 2) + '\n'
+      );
+    } else {
+      const usage = err instanceof ParseError && err.usage ? `\n${USAGE}` : '';
+      process.stderr.write(`vk-guard: ${err.message}\n${usage}`);
+    }
     return 1;
   }
 

@@ -300,6 +300,28 @@ describe('snapshot validation', () => {
     expect(() => readSnapshot(path)).toThrow(/Counter\.increment.*non-negative integer.*vk-guard update/);
   });
 
+  it('rejects a gate count that cannot be subtracted', () => {
+    // A non-numeric count reaches the report as `550 -> x (NaN)`: NaN is never
+    // equal to zero, so it survives the "did this move?" filter and is printed
+    // as a change. A histogram that cannot be subtracted is a malformed
+    // snapshot, and this says so instead.
+    const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-gate-types.json');
+    mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
+    writeFileSync(path, JSON.stringify({
+      o1jsVersion: '3.0.0',
+      contracts: {
+        Counter: {
+          file: 'src/Counter.ts',
+          kind: 'SmartContract',
+          methods: { increment: { rows: 1, digest: 'd', gateTypes: { Poseidon: 'many' } } },
+        },
+      },
+    }));
+    expect(() => readSnapshot(path)).toThrow(
+      /gate type "Poseidon" of method "Counter\.increment" must be a non-negative integer/
+    );
+  });
+
   it('rejects invalid row tolerances before comparison', () => {
     const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-config.json');
     mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
