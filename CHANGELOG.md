@@ -5,6 +5,8 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
 ### Changed
 
 - **Deployment-impact language is now conditional.** Output no longer asserts that a key
@@ -223,6 +225,7 @@ First release.
 - Supports Node.js 20 and newer. `@types/node` and vitest are pinned to versions that
   support that floor, so the support claim is actually tested.
 
-[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/auditinfra-io/vk-guard/releases/tag/v0.1.0
