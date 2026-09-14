@@ -78,6 +78,27 @@ npx vk-guard check       # compare against the baseline (exit 1 on drift)
 Exit code `0` means no drift. Exit code `1` means drift, no contracts found, or a
 contract that could not be measured.
 
+### `--json`
+
+Every `--json` result is a single JSON object on stdout, carrying `ok` whether the run
+succeeded or not — progress goes to stderr, so stdout stays parseable. A run that ends
+before there is a comparison to report is the case a CI integration most needs to read,
+so those are JSON too:
+
+```json
+{
+  "ok": false,
+  "reason": "no-snapshot",
+  "error": "no snapshot at /repo/.vk-guard.json\n\nRun `vk-guard update` to record …",
+  "summary": "2 contracts, 5 methods, o1js 3.0.0"
+}
+```
+
+`reason` is one of `no-contracts`, `no-snapshot`, `rows-only-snapshot` (a full check
+against a baseline recorded with `--rows-only`), or `no-gate-data` (`explain` only).
+An error raised during the run — a contract that failed to compile, for instance —
+comes back as `{"ok": false, "error": "…"}` without a `reason`.
+
 ## What a verification key change means
 
 vk-guard compares a newly compiled verification key against the one committed in your
@@ -298,6 +319,9 @@ another release.
 
 The Action caches o1js compile artifacts across runs, keyed on the o1js version and the
 lockfile hash, and posts (and updates) a single pull request comment summarizing drift.
+`cache-dir` is empty by default, which leaves the location to vk-guard and keeps the
+per-o1js-version namespacing described above; set it only if you want the artifacts
+somewhere specific.
 
 **Compiling real circuits takes minutes.** For a fast signal on every push, use
 `rows-only: true` and run the full check on a schedule or before release:

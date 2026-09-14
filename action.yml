@@ -19,9 +19,9 @@ inputs:
     required: false
     default: 'false'
   cache-dir:
-    description: 'o1js compile cache location, relative to working-directory.'
+    description: 'o1js compile cache location, relative to working-directory. Empty (the default) leaves the location to vk-guard, which namespaces it by o1js version under .vk-guard-cache/.'
     required: false
-    default: '.vk-guard-cache'
+    default: ''
   snapshot:
     description: 'Snapshot file to compare against.'
     required: false
@@ -127,6 +127,17 @@ runs:
         fi
         echo "hash=$HASH" >> "$GITHUB_OUTPUT"
 
+    # What to save and restore when `cache-dir` is left to vk-guard: the parent
+    # directory, which holds the per-o1js-version subdirectory vk-guard chooses.
+    - name: Resolve the cache location
+      id: cachedir
+      shell: bash
+      env:
+        CACHE_DIR: ${{ inputs.cache-dir }}
+      run: |
+        set -euo pipefail
+        echo "path=${CACHE_DIR:-.vk-guard-cache}" >> "$GITHUB_OUTPUT"
+
     # Keyed on the o1js version as well as the lockfile: o1js's own cache
     # entries are content-addressed on the circuit, but that address does not
     # include the o1js version, so artifacts are never shared across versions.
@@ -134,7 +145,7 @@ runs:
       if: ${{ inputs.cache == 'true' }}
       uses: actions/cache@v6
       with:
-        path: ${{ inputs.working-directory }}/${{ inputs.cache-dir }}
+        path: ${{ inputs.working-directory }}/${{ steps.cachedir.outputs.path }}
         key: vk-guard-o1js-${{ steps.o1js.outputs.version }}-${{ steps.lock.outputs.hash }}-${{ runner.os }}
         restore-keys: |
           vk-guard-o1js-${{ steps.o1js.outputs.version }}-
@@ -188,7 +199,16 @@ runs:
         SNAPSHOT: ${{ inputs.snapshot }}
       run: |
         set -uo pipefail
-        ARGS=(check --json --cache-dir "$CACHE_DIR" --snapshot "$SNAPSHOT")
+        ARGS=(check --json --snapshot "$SNAPSHOT")
+        # Passing --cache-dir overrides the location vk-guard picks, and that
+        # location is namespaced by o1js version — the one thing standing
+        # between an upgrade that changes key derivation without changing the
+        # circuit hash and a reused artifact. Sending a fixed directory by
+        # default turned that guard off for every consumer of this action and
+        # left the version separation resting entirely on the cache key, which
+        # does nothing on a runner whose workspace persists. So it is forwarded
+        # only when the caller actually chose a directory.
+        if [ -n "$CACHE_DIR" ]; then ARGS+=(--cache-dir "$CACHE_DIR"); fi
         if [ "$ROWS_ONLY" = "true" ]; then ARGS+=(--rows-only); fi
         for glob in $ENTRY; do ARGS+=(--entry "$glob"); done
 
@@ -351,6 +371,15 @@ runs:
     - name: Fail on drift
       if: ${{ inputs.fail-on-drift == 'true' && steps.check.outputs.drift == 'true' }}
       shell: bash
+      # SUMMARY is passed through the environment rather than interpolated into
+      # the script with ${{ }}. It is derived from vk-guard's own output, which
+      # on an error path is the error message — and that message can quote text
+      # from the repository being checked (a contract name, a file path, the
+      # message of an exception thrown while building a circuit). Substituted
+      # into the script body, a name containing $(...) or backticks would be
+      # executed by the runner; read from the environment it is only ever data.
+      env:
+        SUMMARY: ${{ steps.check.outputs.summary }}
       run: |
-        echo "::error::vk-guard detected drift. ${{ steps.check.outputs.summary }}"
+        echo "::error::vk-guard detected drift. $SUMMARY"
         exit 1

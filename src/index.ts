@@ -60,15 +60,17 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   // Exiting 0 here would manufacture confidence out of an empty search.
   if (contracts.length === 0) {
     const patterns = (opts.entry?.length ? opts.entry : DEFAULT_ENTRY).join(', ');
+    const summary = `0 contracts, 0 methods, o1js ${ctx.o1jsVersion}`;
+    const error =
+      `no contracts found; check --entry\n\n` +
+      `Searched ${scannedFiles} file(s) matching: ${patterns}\n` +
+      `vk-guard looks for exported SmartContract subclasses and ZkProgram objects.\n` +
+      `A run that checks nothing is reported as a failure, never as a pass.`;
     return {
       exitCode: 1,
-      summary: `0 contracts, 0 methods, o1js ${ctx.o1jsVersion}`,
+      summary,
       measured: [],
-      output:
-        `no contracts found; check --entry\n\n` +
-        `Searched ${scannedFiles} file(s) matching: ${patterns}\n` +
-        `vk-guard looks for exported SmartContract subclasses and ZkProgram objects.\n` +
-        `A run that checks nothing is reported as a failure, never as a pass.`,
+      output: opts.json ? failureJson('no-contracts', error, summary) : error,
     };
   }
 
@@ -100,33 +102,60 @@ export async function run(opts: RunOptions): Promise<RunResult> {
       exitCode: 0,
       summary,
       measured,
-      output: `Snapshot written to ${snapshotPath}\n${summary}${warnings}`,
+      output: opts.json
+        ? JSON.stringify(
+            {
+              ok: true,
+              mode: rowsOnly ? 'rows-only' : 'full',
+              action: 'update',
+              snapshot: snapshotPath,
+              summary,
+              contractsChecked: measured.length,
+              methodsChecked: countMethods(measured),
+              typeErrorCount: semanticErrorCount,
+            },
+            null,
+            2
+          )
+        : `Snapshot written to ${snapshotPath}\n${summary}${warnings}`,
     };
   }
 
   if (!snapshotExists(snapshotPath)) {
+    const error =
+      `no snapshot at ${snapshotPath}\n\n` +
+      `Run \`vk-guard update\` to record the current state as the baseline, then\n` +
+      `commit the file so CI can compare against it.`;
     return {
       exitCode: 1,
       summary,
       measured,
-      output:
-        `no snapshot at ${snapshotPath}\n\n` +
-        `Run \`vk-guard update\` to record the current state as the baseline, then\n` +
-        `commit the file so CI can compare against it.\n\n${summary}`,
+      output: opts.json
+        ? failureJson('no-snapshot', error, summary, {
+            snapshot: snapshotPath,
+            typeErrorCount: semanticErrorCount,
+          })
+        : `${error}\n\n${summary}`,
     };
   }
 
   const snapshot = readSnapshot(snapshotPath);
 
   if (!rowsOnly && snapshot.rowsOnly) {
+    const error =
+      `the snapshot at ${snapshotPath} was recorded with --rows-only, so it holds no\n` +
+      `verification key hashes to compare against. Re-record it with \`vk-guard update\`\n` +
+      `(without --rows-only), or run this check with --rows-only.`;
     return {
       exitCode: 1,
       summary,
       measured,
-      output:
-        `the snapshot at ${snapshotPath} was recorded with --rows-only, so it holds no\n` +
-        `verification key hashes to compare against. Re-record it with \`vk-guard update\`\n` +
-        `(without --rows-only), or run this check with --rows-only.\n\n${summary}`,
+      output: opts.json
+        ? failureJson('rows-only-snapshot', error, summary, {
+            snapshot: snapshotPath,
+            typeErrorCount: semanticErrorCount,
+          })
+        : `${error}\n\n${summary}`,
     };
   }
 
@@ -161,7 +190,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
             causeDetermined: false,
           },
           contractsChecked: measured.length,
-          methodsChecked: measured.reduce((n, m) => n + Object.keys(m.methods).length, 0),
+          methodsChecked: countMethods(measured),
           // `contractsChecked` counts what was measured, which is not the same
           // as what was compared. These two say where the baseline could not
           // back a comparison, so a consumer can tell a clean run from a run
@@ -231,12 +260,15 @@ export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
   // Same rule as `check`: finding nothing is a failure, never a quiet success.
   if (contracts.length === 0) {
     const patterns = (opts.entry?.length ? opts.entry : DEFAULT_ENTRY).join(', ');
+    const error =
+      `no contracts found; check --entry\n\n` +
+      `Searched ${scannedFiles} file(s) matching: ${patterns}`;
     return {
       exitCode: 1,
       compositions: [],
-      output:
-        `no contracts found; check --entry\n\n` +
-        `Searched ${scannedFiles} file(s) matching: ${patterns}`,
+      output: opts.json
+        ? failureJson('no-contracts', error, `0 contracts, 0 methods, o1js ${ctx.o1jsVersion}`)
+        : error,
     };
   }
 
@@ -261,12 +293,17 @@ export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
   }
 
   if (compositions.length === 0) {
+    const error =
+      `this o1js version did not expose gate data for any method, so there is ` +
+      `nothing to explain.\nAffected: ${missingGates.join(', ')}`;
     return {
       exitCode: 1,
       compositions: [],
-      output:
-        `this o1js version did not expose gate data for any method, so there is ` +
-        `nothing to explain.\nAffected: ${missingGates.join(', ')}`,
+      output: opts.json
+        ? failureJson('no-gate-data', error, `0 methods, o1js ${ctx.o1jsVersion}`, {
+            methodsWithoutGates: missingGates,
+          })
+        : error,
     };
   }
 
@@ -275,7 +312,15 @@ export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
       exitCode: 0,
       compositions,
       output: JSON.stringify(
-        { o1jsVersion: ctx.o1jsVersion, methods: compositions, methodsWithoutGates: missingGates },
+        {
+          // `ok` is present on every --json result, success or failure, so a
+          // consumer can branch on one field without knowing which command ran
+          // or which way it ended.
+          ok: true,
+          o1jsVersion: ctx.o1jsVersion,
+          methods: compositions,
+          methodsWithoutGates: missingGates,
+        },
         null,
         2
       ),
@@ -298,6 +343,34 @@ export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
     output:
       `${body}\n\n${compositions.length} method(s), ${totalRows} rows total, o1js ${ctx.o1jsVersion}${note}`,
   };
+}
+
+/**
+ * A failure rendered as JSON, for the paths that end a run before there is a
+ * comparison to report.
+ *
+ * `--json` promises machine-readable output on stdout, and these paths used to
+ * print the human report instead — so the one case a CI integration most needs
+ * to read (the check proved nothing) was the one it could not parse. The
+ * composite action reads this file: on a parse failure it sets an empty summary
+ * and skips the pull request comment entirely, leaving a failed job with no
+ * explanation of what went wrong.
+ *
+ * Shaped like the CLI's catch-all error object (`ok: false` plus `error`, which
+ * carries the same text the human report shows), with a stable `reason` code so
+ * a consumer can distinguish these outcomes without matching on prose.
+ */
+function failureJson(
+  reason: 'no-contracts' | 'no-snapshot' | 'rows-only-snapshot' | 'no-gate-data',
+  error: string,
+  summary: string,
+  extra: Record<string, unknown> = {}
+): string {
+  return JSON.stringify({ ok: false, reason, error, summary, ...extra }, null, 2);
+}
+
+function countMethods(measured: Measured[]): number {
+  return measured.reduce((n, m) => n + Object.keys(m.methods).length, 0);
 }
 
 function stripName(m: Measured) {

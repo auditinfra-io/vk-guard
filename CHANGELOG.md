@@ -24,6 +24,16 @@ All notable changes to this project will be documented here. This project follow
   the same conditional wording and the same `SmartContract`/`ZkProgram` split, and now
   names each target's kind. It is covered by tests for the first time.
 
+- **The action's `cache-dir` input now defaults to empty**, meaning "wherever vk-guard
+  puts it". It sent a fixed `.vk-guard-cache` before, which overrode the very thing the
+  default exists for: vk-guard namespaces its cache by o1js version
+  (`.vk-guard-cache/o1js-<version>/`) so that an upgrade changing key derivation without
+  changing the circuit hash cannot reuse an artifact. Through the action that guard was
+  off, leaving the separation to the workflow cache key alone — which separates nothing
+  on a runner whose workspace persists between jobs. Set the input to a path to choose
+  the location yourself, as before; the workflow cache still saves and restores the
+  parent directory.
+
 ### Removed
 
 - **Causal inference.** `versionChangeExplainsVk` and the JSON field
@@ -41,6 +51,32 @@ All notable changes to this project will be documented here. This project follow
   `observations` block carrying these counts plus `causeDetermined: false`.
 
 ### Fixed
+
+- **`--json` now covers the paths that end a run before a comparison.** Finding no
+  contracts, finding no snapshot, and running a full check against a `--rows-only`
+  baseline all printed the human report on stdout even under `--json`, and so did
+  `update` and `explain`'s two failure paths. The exit codes were right, but the output
+  was unparseable — so the one case a CI integration most needs to read, the check that
+  proved nothing, was the one it could not read. The composite action is the concrete
+  victim: its `JSON.parse` failed, the `summary` output came back empty, and the pull
+  request comment was skipped on a job that had just failed. Each of these now emits
+  `{ ok: false, reason, error, summary }`, with `reason` one of `no-contracts`,
+  `no-snapshot`, `rows-only-snapshot` or `no-gate-data`; `update --json` reports the
+  written baseline as `{ ok: true, action: "update", snapshot, … }`. `ok` is now present
+  on every `--json` result, `explain`'s included, so a consumer can branch on one field.
+  Human output is unchanged.
+
+- **The action no longer interpolates vk-guard's output into a shell script.** The
+  "Fail on drift" step substituted `${{ steps.check.outputs.summary }}` directly into its
+  `run:` body. On an error path that summary is the error message, which can quote text
+  from the repository being checked — a contract name, a file path, the message of an
+  exception thrown while a circuit is built — so a name containing `$(…)` or backticks
+  would have been executed by the runner. It is passed through the environment now, as
+  the job-summary step already did, where it is only ever data.
+
+- **A gate count that is not a number is rejected when the snapshot is read.** It
+  otherwise survived to the drift report, where subtracting it yields `NaN` — never equal
+  to zero, so it passed the "did this move?" filter and printed as `550 -> x (NaN)`.
 
 - **Duplicate target names are rejected before measurement.** A snapshot is keyed by
   target name alone, so two distinct targets sharing a name silently overwrote each

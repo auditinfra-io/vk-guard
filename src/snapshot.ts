@@ -112,6 +112,23 @@ function validateContract(value: unknown, path: string, name: string): ContractE
     if (entry.gateTypes !== undefined && !isRecord(entry.gateTypes)) {
       invalid(path, `method "${name}.${method}" has a non-object "gateTypes"`);
     }
+    // The counts themselves are validated, not just the shape of the object.
+    // A non-numeric count survives as far as the report, where subtracting it
+    // from the measured count yields NaN — which is never equal to zero, so it
+    // passes the "did this move?" filter and prints as `550 -> x (NaN)`. A
+    // histogram that cannot be subtracted is a malformed snapshot, and saying
+    // so here is the difference between an actionable error and gibberish in a
+    // drift report.
+    if (isRecord(entry.gateTypes)) {
+      for (const [type, count] of Object.entries(entry.gateTypes)) {
+        if (!Number.isSafeInteger(count) || (count as number) < 0) {
+          invalid(
+            path,
+            `gate type "${type}" of method "${name}.${method}" must be a non-negative integer`
+          );
+        }
+      }
+    }
     return [
       method,
       {

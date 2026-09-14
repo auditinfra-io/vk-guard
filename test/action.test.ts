@@ -154,6 +154,25 @@ describe('the action PR comment', () => {
     }
   });
 
+  // The paths that end a run before there is a comparison — nothing discovered,
+  // no baseline, a full check against a rows-only baseline — now emit JSON like
+  // every other --json result, so the comment can report them instead of the
+  // script bailing out on an unparseable file and leaving a failed job silent.
+  it('reports a run that could not complete, rather than an empty result', async () => {
+    const body = await render({
+      ok: false,
+      reason: 'no-contracts',
+      error: 'no contracts found; check --entry\n\nSearched 3 file(s) matching: src/**/*.ts',
+      summary: '0 contracts, 0 methods, o1js 3.0.0',
+    });
+    expect(body).toContain('could not complete the check');
+    expect(body).toContain('no contracts found; check --entry');
+    // No verification key table, and none of the deployment consequence text:
+    // nothing was compared, so there is nothing to say about a key.
+    expect(body).not.toMatch(SMART_CONTRACT);
+    expect(body).not.toMatch(ZK_PROGRAM);
+  });
+
   it('reports the o1js version as a fact on either side of a change', async () => {
     const unchanged = await render(result([counter]));
     expect(unchanged).toContain('o1js version unchanged (3.0.0)');

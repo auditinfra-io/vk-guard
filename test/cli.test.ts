@@ -239,6 +239,66 @@ describe('--json', () => {
     expect(parsed.rowChanges[0].delta).toBe(1);
     expect(parsed.methodDigestChanges[0].method).toBe('increment');
   });
+
+  // A run that ends before there is a comparison to report is the case a CI
+  // integration most needs to read, and it was the one case --json did not
+  // cover: these paths printed the human report on stdout, so the composite
+  // action's `JSON.parse` failed, the summary output came back empty, and the
+  // pull request comment was skipped on a job that had just failed.
+  it('stays parseable when no contracts are found', () => {
+    const dir = makeProject('json-no-contracts', {
+      'src/util.ts': 'export const helper = (a: number) => a + 1;\n',
+    });
+    const check = runCli(dir, ['check', '--rows-only', '--json']);
+    expect(check.code, check.all).toBe(1);
+
+    const parsed = JSON.parse(check.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('no-contracts');
+    expect(parsed.error).toContain('no contracts found');
+    // Never "0 contracts checked, nothing to report": the summary says what the
+    // run actually examined on this path too.
+    expect(parsed.summary).toMatch(/^0 contracts, 0 methods, o1js /);
+  });
+
+  it('stays parseable when there is no snapshot to compare against', () => {
+    const dir = makeProject('json-no-snapshot', { 'src/Counter.ts': COUNTER });
+    const check = runCli(dir, ['check', '--rows-only', '--json']);
+    expect(check.code, check.all).toBe(1);
+
+    const parsed = JSON.parse(check.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('no-snapshot');
+    expect(parsed.snapshot).toContain('.vk-guard.json');
+    expect(parsed.summary).toMatch(/1 contract, 2 methods, o1js /);
+  });
+
+  it('stays parseable when a full check meets a rows-only snapshot', () => {
+    const dir = makeProject('json-rows-only-snapshot', { 'src/Counter.ts': COUNTER });
+    expect(runCli(dir, ['update', '--rows-only']).code).toBe(0);
+
+    const check = runCli(dir, ['check', '--json']);
+    expect(check.code, check.all).toBe(1);
+
+    const parsed = JSON.parse(check.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('rows-only-snapshot');
+    expect(parsed.error).toContain('--rows-only');
+  });
+
+  it('reports a written baseline as JSON on update', () => {
+    const dir = makeProject('json-update', { 'src/Counter.ts': COUNTER });
+    const update = runCli(dir, ['update', '--rows-only', '--json']);
+    expect(update.code, update.all).toBe(0);
+
+    const parsed = JSON.parse(update.stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.action).toBe('update');
+    expect(parsed.mode).toBe('rows-only');
+    expect(parsed.snapshot).toContain('.vk-guard.json');
+    expect(parsed.contractsChecked).toBe(1);
+    expect(parsed.methodsChecked).toBe(2);
+  });
 });
 
 // Case 5, end to end: a snapshot recorded under a different o1js version.
@@ -391,6 +451,7 @@ describe('explain', () => {
     expect(res.code, res.all).toBe(0);
 
     const parsed = JSON.parse(res.stdout);
+    expect(parsed.ok).toBe(true);
     expect(parsed.o1jsVersion).toMatch(/^\d+\.\d+\.\d+/);
     const inc = parsed.methods.find(
       (m: { contract: string; method: string }) => m.method === 'increment'
@@ -417,5 +478,17 @@ describe('explain', () => {
     const res = runCli(dir, ['explain', '--rows-only']);
     expect(res.code, res.all).toBe(1);
     expect(res.stdout).toContain('no contracts found');
+  });
+
+  it('reports finding nothing as JSON when asked for JSON', () => {
+    const dir = makeProject('explain-empty-json', {
+      'src/util.ts': 'export const helper = (a: number) => a + 1;\n',
+    });
+    const res = runCli(dir, ['explain', '--rows-only', '--json']);
+    expect(res.code, res.all).toBe(1);
+
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('no-contracts');
   });
 });
