@@ -49,7 +49,11 @@ export function makeProject(name: string, files: Record<string, string>): string
   mkdirSync(join(dir, 'src'), { recursive: true });
   writeFileSync(
     join(dir, 'package.json'),
-    JSON.stringify({ name: `fixture-${name}`, version: '0.0.0', private: true, type: 'module' }, null, 2)
+    JSON.stringify(
+      { name: `fixture-${name}`, version: '0.0.0', private: true, type: 'module' },
+      null,
+      2
+    )
   );
   writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify(TSCONFIG, null, 2));
   for (const [rel, content] of Object.entries(files)) {

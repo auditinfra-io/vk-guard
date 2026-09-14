@@ -39,7 +39,9 @@ const runs = [
 ];
 
 const width = Math.max(...runs.map((r) => r.label.length));
-console.log(`${'run'.padEnd(width)}  ${'seconds'.padStart(7)}  ${'rows'.padStart(5)}  verification key hash`);
+console.log(
+  `${'run'.padEnd(width)}  ${'seconds'.padStart(7)}  ${'rows'.padStart(5)}  verification key hash`
+);
 for (const r of runs) {
   console.log(
     `${r.label.padEnd(width)}  ${String(r.seconds).padStart(7)}  ${String(r.rows).padStart(5)}  ${r.vkHash.slice(0, 10)}…${r.vkHash.slice(-4)}`
@@ -54,7 +56,9 @@ console.log(
   `\n${deterministic ? 'DETERMINISTIC' : 'NOT DETERMINISTIC'}: ${hashes.size} distinct verification key(s) across ${runs.length} runs.`
 );
 if (!deterministic) {
-  console.error('\nvk-guard\'s core premise does not hold on this platform. Do not trust a snapshot here.');
+  console.error(
+    "\nvk-guard's core premise does not hold on this platform. Do not trust a snapshot here."
+  );
 }
 rmSync(CACHE, { recursive: true, force: true });
 process.exit(deterministic ? 0 : 1);

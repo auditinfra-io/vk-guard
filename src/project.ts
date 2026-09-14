@@ -47,7 +47,10 @@ export async function loadProject(root: string, cacheRoot: string): Promise<Proj
  * project's own resolution and conditions, guaranteeing we hold the same
  * `SmartContract` object the contracts extend.
  */
-async function importProjectO1js(root: string, cacheRoot: string): Promise<Record<string, unknown>> {
+async function importProjectO1js(
+  root: string,
+  cacheRoot: string
+): Promise<Record<string, unknown>> {
   mkdirSync(cacheRoot, { recursive: true });
   const shim = join(cacheRoot, 'o1js-resolver.mjs');
   writeFileSync(shim, `export * as o1js from 'o1js';\n`, 'utf8');

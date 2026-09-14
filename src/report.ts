@@ -109,7 +109,9 @@ export function renderComparison(c: Comparison, rowsOnly: boolean): string {
     );
   }
   if (c.addedMethods.length > 0) {
-    out.push(`New methods:\n${c.addedMethods.map((m) => `  ${m.contract}.${m.method}()`).join('\n')}`);
+    out.push(
+      `New methods:\n${c.addedMethods.map((m) => `  ${m.contract}.${m.method}()`).join('\n')}`
+    );
   }
   if (c.removedMethods.length > 0) {
     out.push(

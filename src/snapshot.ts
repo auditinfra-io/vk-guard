@@ -96,50 +96,53 @@ function validateSnapshot(parsed: unknown, path: string): Snapshot {
 
 function validateContract(value: unknown, path: string, name: string): ContractEntry {
   if (!isRecord(value)) invalid(path, `contract "${name}" must be an object`);
-  if (typeof value.file !== 'string') invalid(path, `contract "${name}" is missing a string "file"`);
+  if (typeof value.file !== 'string')
+    invalid(path, `contract "${name}" is missing a string "file"`);
   if (value.kind !== 'SmartContract' && value.kind !== 'ZkProgram') {
     invalid(path, `contract "${name}" has an invalid "kind"`);
   }
   if (!isRecord(value.methods)) invalid(path, `contract "${name}" is missing "methods"`);
 
-  const methods = Object.fromEntries(Object.entries(value.methods).map(([method, entry]) => {
-    if (!isRecord(entry) || !Number.isSafeInteger(entry.rows) || (entry.rows as number) < 0) {
-      invalid(path, `method "${name}.${method}" must have a non-negative integer "rows"`);
-    }
-    if (entry.digest !== undefined && typeof entry.digest !== 'string') {
-      invalid(path, `method "${name}.${method}" has a non-string "digest"`);
-    }
-    if (entry.gateTypes !== undefined && !isRecord(entry.gateTypes)) {
-      invalid(path, `method "${name}.${method}" has a non-object "gateTypes"`);
-    }
-    // The counts themselves are validated, not just the shape of the object.
-    // A non-numeric count survives as far as the report, where subtracting it
-    // from the measured count yields NaN — which is never equal to zero, so it
-    // passes the "did this move?" filter and prints as `550 -> x (NaN)`. A
-    // histogram that cannot be subtracted is a malformed snapshot, and saying
-    // so here is the difference between an actionable error and gibberish in a
-    // drift report.
-    if (isRecord(entry.gateTypes)) {
-      for (const [type, count] of Object.entries(entry.gateTypes)) {
-        if (!Number.isSafeInteger(count) || (count as number) < 0) {
-          invalid(
-            path,
-            `gate type "${type}" of method "${name}.${method}" must be a non-negative integer`
-          );
+  const methods = Object.fromEntries(
+    Object.entries(value.methods).map(([method, entry]) => {
+      if (!isRecord(entry) || !Number.isSafeInteger(entry.rows) || (entry.rows as number) < 0) {
+        invalid(path, `method "${name}.${method}" must have a non-negative integer "rows"`);
+      }
+      if (entry.digest !== undefined && typeof entry.digest !== 'string') {
+        invalid(path, `method "${name}.${method}" has a non-string "digest"`);
+      }
+      if (entry.gateTypes !== undefined && !isRecord(entry.gateTypes)) {
+        invalid(path, `method "${name}.${method}" has a non-object "gateTypes"`);
+      }
+      // The counts themselves are validated, not just the shape of the object.
+      // A non-numeric count survives as far as the report, where subtracting it
+      // from the measured count yields NaN — which is never equal to zero, so it
+      // passes the "did this move?" filter and prints as `550 -> x (NaN)`. A
+      // histogram that cannot be subtracted is a malformed snapshot, and saying
+      // so here is the difference between an actionable error and gibberish in a
+      // drift report.
+      if (isRecord(entry.gateTypes)) {
+        for (const [type, count] of Object.entries(entry.gateTypes)) {
+          if (!Number.isSafeInteger(count) || (count as number) < 0) {
+            invalid(
+              path,
+              `gate type "${type}" of method "${name}.${method}" must be a non-negative integer`
+            );
+          }
         }
       }
-    }
-    return [
-      method,
-      {
-        rows: entry.rows as number,
-        ...(entry.digest === undefined ? {} : { digest: entry.digest as string }),
-        ...(entry.gateTypes === undefined
-          ? {}
-          : { gateTypes: entry.gateTypes as Record<string, number> }),
-      },
-    ];
-  }));
+      return [
+        method,
+        {
+          rows: entry.rows as number,
+          ...(entry.digest === undefined ? {} : { digest: entry.digest as string }),
+          ...(entry.gateTypes === undefined
+            ? {}
+            : { gateTypes: entry.gateTypes as Record<string, number> }),
+        },
+      ];
+    })
+  );
   for (const key of ['verificationKeyHash', 'digest'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
       invalid(path, `contract "${name}" has a non-string "${key}"`);
@@ -149,7 +152,9 @@ function validateContract(value: unknown, path: string, name: string): ContractE
     file: value.file as string,
     kind: value.kind as ContractEntry['kind'],
     methods,
-    ...(value.verificationKeyHash === undefined ? {} : { verificationKeyHash: value.verificationKeyHash as string }),
+    ...(value.verificationKeyHash === undefined
+      ? {}
+      : { verificationKeyHash: value.verificationKeyHash as string }),
     ...(value.digest === undefined ? {} : { digest: value.digest as string }),
   };
 }
@@ -159,12 +164,14 @@ function validateConfig(value: unknown, path: string): Snapshot['config'] {
   if (!isRecord(value)) invalid(path, '"config" must be an object');
   if (value.rowTolerance === undefined) return {};
   if (!isRecord(value.rowTolerance)) invalid(path, '"config.rowTolerance" must be an object');
-  const rowTolerance = Object.fromEntries(Object.entries(value.rowTolerance).map(([key, tolerance]) => {
-    if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {
-      invalid(path, `row tolerance "${key}" must be a non-negative number`);
-    }
-    return [key, tolerance as number];
-  }));
+  const rowTolerance = Object.fromEntries(
+    Object.entries(value.rowTolerance).map(([key, tolerance]) => {
+      if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0) {
+        invalid(path, `row tolerance "${key}" must be a non-negative number`);
+      }
+      return [key, tolerance as number];
+    })
+  );
   return { rowTolerance };
 }
 
