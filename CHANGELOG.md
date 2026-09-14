@@ -68,6 +68,12 @@ All notable changes to this project will be documented here. This project follow
   on every `--json` result, `explain`'s included, so a consumer can branch on one field.
   Human output is unchanged.
 
+  A failure in argument parsing is covered too, with `reason: "bad-arguments"`. That one
+  happens before there is a parsed result to consult, so `--json` is read from the raw
+  arguments; it is also the first failure a misconfigured workflow hits, and it left
+  stdout entirely empty. The usage text still follows an unknown option on stderr for a
+  person, and stays out of the JSON, where a screenful of help is no use.
+
 - **The action no longer interpolates vk-guard's output into a shell script.** The
   "Fail on drift" step substituted `${{ steps.check.outputs.summary }}` directly into its
   `run:` body. On an error path that summary is the error message, which can quote text

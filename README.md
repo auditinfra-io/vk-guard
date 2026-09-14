@@ -95,9 +95,13 @@ so those are JSON too:
 ```
 
 `reason` is one of `no-contracts`, `no-snapshot`, `rows-only-snapshot` (a full check
-against a baseline recorded with `--rows-only`), or `no-gate-data` (`explain` only).
-An error raised during the run — a contract that failed to compile, for instance —
-comes back as `{"ok": false, "error": "…"}` without a `reason`.
+against a baseline recorded with `--rows-only`), `no-gate-data` (`explain` only), or
+`bad-arguments` — a malformed or unknown option, which is the failure a misconfigured
+workflow hits first and so is reported on stdout like any other. An error raised during
+the run — a contract that failed to compile, for instance — comes back as
+`{"ok": false, "error": "…"}` without a `reason`.
+
+`--help` and `--version` are for people and still print text.
 
 ## What a verification key change means
 

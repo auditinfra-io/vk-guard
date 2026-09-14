@@ -286,6 +286,48 @@ describe('--json', () => {
     expect(parsed.error).toContain('--rows-only');
   });
 
+  // Argument parsing fails before there is a parsed result to consult, so this
+  // path has to read --json off the raw argv. It is the failure a CI
+  // integration is most likely to hit first — a misconfigured workflow input —
+  // and stdout was empty for it, which is the one thing JSON.parse cannot
+  // survive.
+  it('stays parseable when an option is missing its value', () => {
+    const dir = makeProject('json-bad-args', { 'src/Counter.ts': COUNTER });
+    const res = runCli(dir, ['check', '--json', '--snapshot']);
+    expect(res.code, res.all).toBe(1);
+
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('bad-arguments');
+    expect(parsed.error).toBe('--snapshot requires a value');
+  });
+
+  it('stays parseable on an unknown option, without the usage text inside it', () => {
+    const dir = makeProject('json-unknown-option', { 'src/Counter.ts': COUNTER });
+    const res = runCli(dir, ['check', '--json', '--bogus']);
+    expect(res.code, res.all).toBe(1);
+
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.reason).toBe('bad-arguments');
+    expect(parsed.error).toBe('unknown option: --bogus');
+    // A screenful of help is for a person, not for a machine.
+    expect(parsed.error).not.toContain('Usage:');
+  });
+
+  it('still shows a person the usage text on stderr, and leaves stdout empty', () => {
+    const dir = makeProject('human-unknown-option', { 'src/Counter.ts': COUNTER });
+    const res = runCli(dir, ['check', '--bogus']);
+    expect(res.code, res.all).toBe(1);
+    expect(res.stdout).toBe('');
+    expect(res.stderr).toContain('unknown option: --bogus');
+    expect(res.stderr).toContain('Usage:');
+    // A flag that is merely missing its value does not warrant the whole help.
+    const missingValue = runCli(dir, ['check', '--snapshot']);
+    expect(missingValue.stderr).toContain('--snapshot requires a value');
+    expect(missingValue.stderr).not.toContain('Usage:');
+  });
+
   it('reports a written baseline as JSON on update', () => {
     const dir = makeProject('json-update', { 'src/Counter.ts': COUNTER });
     const update = runCli(dir, ['update', '--rows-only', '--json']);
