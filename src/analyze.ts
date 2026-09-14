@@ -93,8 +93,7 @@ async function failLoudly<T>(d: Discovered, what: string, fn: () => Promise<T>):
 
 function makeCache(ctx: ProjectContext, cacheDir: string | undefined): unknown {
   const Cache = ctx.o1js.Cache as
-    | { FileSystem(dir: string): unknown; FileSystemDefault: unknown }
-    | undefined;
+    { FileSystem(dir: string): unknown; FileSystemDefault: unknown } | undefined;
   if (!Cache) return undefined;
   const dir = cacheDir ?? defaultCacheDir(ctx.root, ctx.o1jsVersion);
   return Cache.FileSystem(dir);

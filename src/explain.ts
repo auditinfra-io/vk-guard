@@ -125,6 +125,9 @@ export function renderComposition(name: string, c: GateComposition): string {
     }
   }
 
-  out.push('', `  wire locality: ${(c.wireLocality * 100).toFixed(1)}% of wires stay within ${LOCAL_WIRE_SPAN} rows`);
+  out.push(
+    '',
+    `  wire locality: ${(c.wireLocality * 100).toFixed(1)}% of wires stay within ${LOCAL_WIRE_SPAN} rows`
+  );
   return out.join('\n');
 }

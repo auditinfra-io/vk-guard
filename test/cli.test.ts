@@ -43,7 +43,10 @@ describe('a changed method body', () => {
     // Replace the arithmetic: a genuinely different circuit.
     writeFileSync(
       join(dir, 'src/Counter.ts'),
-      COUNTER.replace('this.count.set(current.add(by));', 'this.count.set(current.mul(by).add(by));')
+      COUNTER.replace(
+        'this.count.set(current.add(by));',
+        'this.count.set(current.mul(by).add(by));'
+      )
     );
 
     const check = runCli(dir, ['check']);
@@ -355,7 +358,8 @@ describe('a snapshot recorded under a different o1js version', () => {
     const snap = readSnap(dir);
     const realVersion = snap.o1jsVersion;
     snap.o1jsVersion = '0.0.1-previous';
-    snap.contracts.Counter.verificationKeyHash = '12345678901234567890123456789012345678901234567890';
+    snap.contracts.Counter.verificationKeyHash =
+      '12345678901234567890123456789012345678901234567890';
     writeFileSync(join(dir, '.vk-guard.json'), JSON.stringify(snap, null, 2));
 
     const check = runCli(dir, ['check']);

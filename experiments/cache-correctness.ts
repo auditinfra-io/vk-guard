@@ -68,7 +68,9 @@ console.log(
   `\n${safe ? 'CACHE IS SAFE' : 'CACHE IS UNSAFE'}: a warm cache ${safe ? 'cannot' : 'CAN'} serve a key that contradicts the source.`
 );
 if (safe) {
-  console.log('forceRecompile is therefore unnecessary, and vk-guard keeps the cache for the speedup.');
+  console.log(
+    'forceRecompile is therefore unnecessary, and vk-guard keeps the cache for the speedup.'
+  );
 } else {
   console.error('vk-guard must use forceRecompile on this platform, or checks can pass falsely.');
 }

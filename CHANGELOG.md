@@ -5,6 +5,16 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Changed
+
+- Source is auto-formatted with prettier, and CI fails on unformatted code. This is a
+  requirement for listing in o1js's community packages, and it removes hand-formatting
+  from review. Markdown is deliberately excluded: the README embeds real CLI output and
+  workflow fragments whose indentation carries meaning — prettier treats a fenced `yaml`
+  block as a standalone document and de-indents a snippet that belongs under `steps:`.
+  Snapshots are excluded too, since their formatting is the tool's output rather than a
+  style choice. No behavior changed; the reformatting is whitespace only.
+
 ## [0.3.0] - 2026-09-14
 
 ### Changed

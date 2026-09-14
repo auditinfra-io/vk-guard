@@ -47,7 +47,9 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run format:check && npm run typecheck && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "pretest": "npm run build",
     "prepack": "npm run build",
     "example:check": "node dist/cli.js check --root examples/counter --snapshot examples/counter/.vk-guard.json",
@@ -65,6 +67,7 @@
   "devDependencies": {
     "@types/node": "^20.19.9",
     "o1js": "^3.0.0",
+    "prettier": "^3.9.6",
     "vitest": "^4.1.11"
   }
 }

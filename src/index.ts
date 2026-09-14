@@ -332,16 +332,12 @@ export async function explain(opts: ExplainOptions): Promise<ExplainResult> {
     .join('\n\n');
 
   const totalRows = compositions.reduce((n, c) => n + c.composition.rows, 0);
-  const note =
-    missingGates.length > 0
-      ? `\n\nNo gate data for: ${missingGates.join(', ')}`
-      : '';
+  const note = missingGates.length > 0 ? `\n\nNo gate data for: ${missingGates.join(', ')}` : '';
 
   return {
     exitCode: 0,
     compositions,
-    output:
-      `${body}\n\n${compositions.length} method(s), ${totalRows} rows total, o1js ${ctx.o1jsVersion}${note}`,
+    output: `${body}\n\n${compositions.length} method(s), ${totalRows} rows total, o1js ${ctx.o1jsVersion}${note}`,
   };
 }
 

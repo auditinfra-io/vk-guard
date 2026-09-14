@@ -72,7 +72,12 @@ describe('compare', () => {
   }
 
   it('SDK version changed, all measured keys changed: states both, claims neither caused the other', () => {
-    const c = compare(snapshot({ o1jsVersion: '2.3.0' }), measured({ verificationKeyHash: '999' }), '2.4.0', false);
+    const c = compare(
+      snapshot({ o1jsVersion: '2.3.0' }),
+      measured({ verificationKeyHash: '999' }),
+      '2.4.0',
+      false
+    );
     expect(c.o1jsChanged).toBe(true);
     expect(c.allComparedKeysChanged).toBe(true);
 
@@ -102,7 +107,10 @@ describe('compare', () => {
       snapshot(),
       measured({
         verificationKeyHash: '999',
-        methods: { deposit: { rows: 1900, digest: 'CHANGED' }, withdraw: { rows: 3110, digest: 'd2' } },
+        methods: {
+          deposit: { rows: 1900, digest: 'CHANGED' },
+          withdraw: { rows: 3110, digest: 'd2' },
+        },
       }),
       '2.4.0',
       false
@@ -240,7 +248,12 @@ describe('row tolerance', () => {
     const snap = snapshot({ config: { rowTolerance: { default: 1_000_000 } } });
     const c = compare(
       snap,
-      measured({ methods: { deposit: { rows: 1843, digest: 'MOVED' }, withdraw: { rows: 3110, digest: 'd2' } } }),
+      measured({
+        methods: {
+          deposit: { rows: 1843, digest: 'MOVED' },
+          withdraw: { rows: 3110, digest: 'd2' },
+        },
+      }),
       '2.3.0',
       true
     );
@@ -273,8 +286,18 @@ describe('snapshot serialization', () => {
     const a = serializeSnapshot(snapshot());
     const reordered = snapshot();
     reordered.contracts = {
-      Zebra: { file: 'src/Z.ts', kind: 'SmartContract', verificationKeyHash: '1', methods: { b: { rows: 1 }, a: { rows: 2 } } },
-      Alpha: { file: 'src/A.ts', kind: 'SmartContract', verificationKeyHash: '2', methods: { z: { rows: 1 } } },
+      Zebra: {
+        file: 'src/Z.ts',
+        kind: 'SmartContract',
+        verificationKeyHash: '1',
+        methods: { b: { rows: 1 }, a: { rows: 2 } },
+      },
+      Alpha: {
+        file: 'src/A.ts',
+        kind: 'SmartContract',
+        verificationKeyHash: '2',
+        methods: { z: { rows: 1 } },
+      },
     };
     const text = serializeSnapshot(reordered);
     expect(text.indexOf('Alpha')).toBeLessThan(text.indexOf('Zebra'));
@@ -291,13 +314,22 @@ describe('snapshot validation', () => {
   it('rejects malformed method data with an actionable error', () => {
     const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-snapshot.json');
     mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
-    writeFileSync(path, JSON.stringify({
-      o1jsVersion: '3.0.0',
-      contracts: {
-        Counter: { file: 'src/Counter.ts', kind: 'SmartContract', methods: { increment: { rows: -1 } } },
-      },
-    }));
-    expect(() => readSnapshot(path)).toThrow(/Counter\.increment.*non-negative integer.*vk-guard update/);
+    writeFileSync(
+      path,
+      JSON.stringify({
+        o1jsVersion: '3.0.0',
+        contracts: {
+          Counter: {
+            file: 'src/Counter.ts',
+            kind: 'SmartContract',
+            methods: { increment: { rows: -1 } },
+          },
+        },
+      })
+    );
+    expect(() => readSnapshot(path)).toThrow(
+      /Counter\.increment.*non-negative integer.*vk-guard update/
+    );
   });
 
   it('rejects a gate count that cannot be subtracted', () => {
@@ -307,16 +339,19 @@ describe('snapshot validation', () => {
     // snapshot, and this says so instead.
     const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-gate-types.json');
     mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
-    writeFileSync(path, JSON.stringify({
-      o1jsVersion: '3.0.0',
-      contracts: {
-        Counter: {
-          file: 'src/Counter.ts',
-          kind: 'SmartContract',
-          methods: { increment: { rows: 1, digest: 'd', gateTypes: { Poseidon: 'many' } } },
+    writeFileSync(
+      path,
+      JSON.stringify({
+        o1jsVersion: '3.0.0',
+        contracts: {
+          Counter: {
+            file: 'src/Counter.ts',
+            kind: 'SmartContract',
+            methods: { increment: { rows: 1, digest: 'd', gateTypes: { Poseidon: 'many' } } },
+          },
         },
-      },
-    }));
+      })
+    );
     expect(() => readSnapshot(path)).toThrow(
       /gate type "Poseidon" of method "Counter\.increment" must be a non-negative integer/
     );
@@ -325,10 +360,17 @@ describe('snapshot validation', () => {
   it('rejects invalid row tolerances before comparison', () => {
     const path = join(REPO_ROOT, 'test', '.tmp', 'malformed-config.json');
     mkdirSync(join(REPO_ROOT, 'test', '.tmp'), { recursive: true });
-    writeFileSync(path, JSON.stringify({
-      o1jsVersion: '3.0.0', config: { rowTolerance: { default: -1 } }, contracts: {},
-    }));
-    expect(() => readSnapshot(path)).toThrow(/row tolerance "default" must be a non-negative number/);
+    writeFileSync(
+      path,
+      JSON.stringify({
+        o1jsVersion: '3.0.0',
+        config: { rowTolerance: { default: -1 } },
+        contracts: {},
+      })
+    );
+    expect(() => readSnapshot(path)).toThrow(
+      /row tolerance "default" must be a non-negative number/
+    );
   });
 
   it('preserves __proto__ as an own contract and method key', () => {
@@ -338,10 +380,13 @@ describe('snapshot validation', () => {
       kind: 'SmartContract',
       methods: Object.fromEntries([['__proto__', { rows: 1, digest: 'method-digest' }]]),
     };
-    writeFileSync(path, JSON.stringify({
-      o1jsVersion: '3.0.0',
-      contracts: Object.fromEntries([['__proto__', contract]]),
-    }));
+    writeFileSync(
+      path,
+      JSON.stringify({
+        o1jsVersion: '3.0.0',
+        contracts: Object.fromEntries([['__proto__', contract]]),
+      })
+    );
 
     const parsed = readSnapshot(path);
     expect(Object.hasOwn(parsed.contracts, '__proto__')).toBe(true);
@@ -480,11 +525,7 @@ describe('names that collide with Object.prototype', () => {
 });
 
 describe('gate type changes', () => {
-  const withGates = (
-    rows: number,
-    digest: string,
-    gateTypes: Record<string, number>
-  ) => ({
+  const withGates = (rows: number, digest: string, gateTypes: Record<string, number>) => ({
     file: 'src/C.ts',
     kind: 'SmartContract' as const,
     verificationKeyHash: 'k',
@@ -586,19 +627,34 @@ describe('a baseline field that is absent cannot read as unchanged', () => {
   }
 
   it('fails when the snapshot has no verification key to compare', () => {
-    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    const c = compare(
+      snapshotWithoutVk(),
+      measured({ verificationKeyHash: '222' }),
+      '2.3.0',
+      false
+    );
     expect(c.vkNotCompared).toEqual(['MyContract']);
     expect(c.failed).toBe(true);
   });
 
   it('does not report the absent key as unchanged', () => {
-    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    const c = compare(
+      snapshotWithoutVk(),
+      measured({ verificationKeyHash: '222' }),
+      '2.3.0',
+      false
+    );
     expect(c.vkUnchanged).toEqual([]);
     expect(c.vkChanges).toEqual([]);
   });
 
   it('says so in the report, rather than printing a clean run', () => {
-    const c = compare(snapshotWithoutVk(), measured({ verificationKeyHash: '222' }), '2.3.0', false);
+    const c = compare(
+      snapshotWithoutVk(),
+      measured({ verificationKeyHash: '222' }),
+      '2.3.0',
+      false
+    );
     const out = renderComparison(c, false);
     expect(out).toContain('No verification key to compare');
     expect(out).toContain('MyContract');
@@ -680,6 +736,8 @@ describe('duplicate names at the compare() boundary', () => {
   });
 
   it('accepts distinct names', () => {
-    expect(() => compare(snapshot(), [dupe('A', 'a'), dupe('B', 'b')], '2.3.0', false)).not.toThrow();
+    expect(() =>
+      compare(snapshot(), [dupe('A', 'a'), dupe('B', 'b')], '2.3.0', false)
+    ).not.toThrow();
   });
 });

@@ -86,7 +86,9 @@ export async function discover(
 
   const SmartContract = ctx.o1js.SmartContract as (new (...a: never[]) => unknown) | undefined;
   if (typeof SmartContract !== 'function') {
-    throw new Error(`the resolved o1js does not export SmartContract; is o1js ${ctx.o1jsVersion} supported?`);
+    throw new Error(
+      `the resolved o1js does not export SmartContract; is o1js ${ctx.o1jsVersion} supported?`
+    );
   }
 
   const contracts: Discovered[] = [];

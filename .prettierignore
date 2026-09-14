@@ -1,0 +1,22 @@
+node_modules
+dist
+coverage
+
+# Build output from the experiments and the temp projects the suite creates.
+experiments/.build
+test/.tmp
+.vk-guard-cache
+
+# Snapshots are written by `vk-guard update` and compared byte-for-byte in
+# tests. Their formatting is the tool's output, not a style choice.
+**/.vk-guard.json
+
+# Generated lockfile.
+package-lock.json
+
+# Markdown is excluded deliberately. The README embeds real CLI output and
+# workflow fragments whose indentation is meaningful: prettier treats a fenced
+# `yaml` block as a standalone document and de-indents a snippet that is meant
+# to sit under `steps:`, which makes the example wrong. Prose formatting is not
+# what the prettier requirement is for.
+*.md
