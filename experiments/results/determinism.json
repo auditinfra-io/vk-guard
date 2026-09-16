@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "experiment": "determinism",
   "status": "passed",
-  "generatedAt": "2026-09-16T12:39:20.845Z",
+  "generatedAt": "2026-09-16T13:35:58.688Z",
   "project": {
     "name": "vk-guard",
-    "version": "0.3.0",
-    "gitCommit": "ed317fac47f4221c4fd5da9f0590b3ca9522750d"
+    "version": "0.4.0",
+    "gitCommit": "0052ef3fee954ec909b59b81be5b9cf6de5f444f"
   },
   "environment": {
     "o1jsVersion": "3.0.0",
@@ -28,7 +28,7 @@
     "fixture": "Probe",
     "fixtureVariants": ["EXTRA_CONSTRAINT=0"],
     "fixtureBuildInputSha256": "a0393972b26a884f0d8cddb6bb8e85f81fcc9d475c56e636526452bb7245e7e1",
-    "lockfileSha256": "548272017e7f5ec7fd8da7f23c3054dd343f44e537c528a496e38c49893cb292"
+    "lockfileSha256": "25a81cab40420cec6566e04e3d12d0255d0fb7972b2f36f993c0259148df8ea0"
   },
   "cases": [
     {
@@ -44,10 +44,10 @@
         "vkDataSha256": "843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607",
         "rows": 615,
         "digest": "2024fad2098e349ee160227807bf701d",
-        "elapsedMs": 61489
+        "elapsedMs": 79140
       },
       "diagnostics": {
-        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":61489}\n",
+        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":79140}\n",
         "stderr": ""
       }
     },
@@ -64,10 +64,10 @@
         "vkDataSha256": "843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607",
         "rows": 615,
         "digest": "2024fad2098e349ee160227807bf701d",
-        "elapsedMs": 6164
+        "elapsedMs": 10269
       },
       "diagnostics": {
-        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":6164}\n",
+        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":10269}\n",
         "stderr": ""
       }
     },
@@ -84,10 +84,10 @@
         "vkDataSha256": "843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607",
         "rows": 615,
         "digest": "2024fad2098e349ee160227807bf701d",
-        "elapsedMs": 50937
+        "elapsedMs": 66818
       },
       "diagnostics": {
-        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":50937}\n",
+        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":66818}\n",
         "stderr": ""
       }
     },
@@ -104,10 +104,10 @@
         "vkDataSha256": "843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607",
         "rows": 615,
         "digest": "2024fad2098e349ee160227807bf701d",
-        "elapsedMs": 61042
+        "elapsedMs": 78984
       },
       "diagnostics": {
-        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":61042}\n",
+        "stdout": "VK_GUARD_EXPERIMENT_RESULT={\"vkHash\":\"24091486627315699338828565281380134699779488524637794172530479723325090832417\",\"vkDataSha256\":\"843f31c5936b750b30940c330e3aa333c3e5d6adb72ded3886f32c4033820607\",\"rows\":615,\"digest\":\"2024fad2098e349ee160227807bf701d\",\"elapsedMs\":78984}\n",
         "stderr": ""
       }
     }
