@@ -5,6 +5,23 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-16
+
+### Added
+
+- Compilation experiments now write versioned, machine-readable JSON records with the
+  resolved toolchain and platform, requested backend, explicit compilation options,
+  fixture and lockfile fingerprints, per-case timings and measurements, independent
+  assertion outcomes, retained worker diagnostics, and structured errors. Verification-key
+  data receives a separately labelled SHA-256 fingerprint in addition to o1js's Field hash.
+- The cache-correctness experiment adds independent cold-cache controls for both the
+  changed circuit and the restored original. The determinism experiment now compares a
+  cold cache, its resulting warm cache, `forceRecompile`, and a second independent cold
+  cache, with every compilation isolated in a fresh process.
+- Synthetic harness tests cover successful measurements, warm/cold disagreement, a
+  mutation that does not change the circuit, restoration mismatch, missing and malformed
+  output, worker crashes, and timeouts.
+
 ### Changed
 
 - Source is auto-formatted with prettier, and CI fails on unformatted code. This is a
@@ -14,6 +31,15 @@ All notable changes to this project will be documented here. This project follow
   block as a standalone document and de-indents a snippet that belongs under `steps:`.
   Snapshots are excluded too, since their formatting is the tool's output rather than a
   style choice. No behavior changed; the reformatting is whitespace only.
+- Compilation experiments use unique temporary directories, isolated cache directories,
+  configurable worker timeouts, robust marked-output parsing, and a documented output
+  directory. A worker error, timeout, malformed result, missing measurement, or failed
+  assertion exits nonzero while still producing a failure record where compilation was
+  able to start.
+- Cache documentation now states only what the fixture and recorded configuration
+  demonstrate. It distinguishes filesystem-cache `persistentId` lookup from `uniqueId`
+  validation, notes the upstream Pickles identifying hash, and treats version-separated
+  cache directories as a conservative policy rather than a universal cache-safety claim.
 
 ## [0.3.0] - 2026-09-14
 

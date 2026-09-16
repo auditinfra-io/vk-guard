@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { Cache } from 'o1js';
 import { Probe } from './fixtures/Probe.js';
+import { RESULT_MARKER } from './harness.js';
 
 /**
  * Compiles Probe once and prints the result as JSON. Run as a child process so
@@ -15,16 +17,17 @@ const force = process.argv[3] === 'force';
 const started = Date.now();
 const analysis = await Probe.analyzeMethods();
 const { verificationKey } = await Probe.compile({
-  ...(cacheDir && cacheDir !== 'none' ? { cache: Cache.FileSystem(cacheDir) } : {}),
+  cache: cacheDir === 'none' ? Cache.None : Cache.FileSystem(cacheDir),
   forceRecompile: force,
 });
 
 const bump = (analysis as Record<string, { rows: number; digest: string }>).bump!;
 process.stdout.write(
-  JSON.stringify({
+  `${RESULT_MARKER}${JSON.stringify({
     vkHash: verificationKey.hash.toString(),
+    vkDataSha256: createHash('sha256').update(verificationKey.data).digest('hex'),
     rows: bump.rows,
     digest: bump.digest,
-    seconds: Number(((Date.now() - started) / 1000).toFixed(1)),
-  })
+    elapsedMs: Date.now() - started,
+  })}\n`
 );

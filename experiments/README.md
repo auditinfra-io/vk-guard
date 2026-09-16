@@ -1,74 +1,106 @@
-# Experiments
+# Compilation experiments
 
-vk-guard rests on two claims about o1js that would be irresponsible to assume.
-These scripts measure them, so the claims in the README are reproducible rather
-than asserted.
+These experiments collect narrowly scoped evidence about o1js compilation
+reproducibility and filesystem-cache invalidation. A passing run describes the
+`Probe` fixture, resolved dependencies, backend request, and machine recorded in
+its JSON; it is not a universal guarantee about other circuits, versions,
+backends, or environments.
 
 ```bash
 npm run experiments
 ```
 
-Each script exits non-zero if its property does **not** hold, so they double as a
-platform check: if determinism fails on your hardware, a committed snapshot is
-meaningless there and vk-guard will say so rather than quietly producing noise.
+The command builds the harness and runs both experiments. Each compilation is a
+fresh Node process. Results are written to `experiments/results/` even when a
+worker fails. To retain them elsewhere or change the five-minute worker limit,
+invoke either built experiment directly:
 
-## 1. Is compilation deterministic? (`determinism.ts`)
+```bash
+npm run experiments:build
+node experiments/.build/determinism.js --output-dir ./artifacts --timeout-ms 600000
+node experiments/.build/cache-correctness.js --output-dir ./artifacts --timeout-ms 600000
+```
 
-Everything vk-guard does depends on this. If compiling an unchanged contract
-produced different verification keys, a committed hash would be worthless and
-every check would be a coin flip.
+The output directory is never used for temporary caches. Every invocation owns
+a unique temporary directory and removes only that directory. Diagnostics are
+retained per case in JSON. A crash, timeout, malformed result, missing
+measurement, or failed assertion makes the script exit nonzero. `O1JS_BACKEND`
+may request a backend; an unavailable request is allowed to fail rather than
+being silently skipped. The installed public API exposes a backend preference,
+not a reliable post-initialization effective-backend observation, so the result
+records the effective backend as `unknown`.
 
-Three compiles of one unchanged contract, each in a **separate process** —
-in-process runs would measure o1js's memoisation, not the compiler:
+## Determinism comparison
 
-| run | seconds | rows | verification key hash |
-| --- | ---: | ---: | --- |
-| cold cache | 16.2 | 615 | `2409148662…2417` |
-| warm cache | 2.5 | 615 | `2409148662…2417` |
-| forceRecompile | 14.1 | 615 | `2409148662…2417` |
+`determinism.ts` compiles the original fixture four ways:
 
-**Deterministic.** One distinct key across three runs, including a fully forced
-recompile. The example project's committed snapshot re-proves this on GitHub's
-runners on every pull request, which extends the result across machines.
+1. empty filesystem cache A;
+2. the resulting warm cache A;
+3. cache A with `forceRecompile: true`;
+4. independent empty filesystem cache B.
 
-## 2. Can a stale cache cause a false pass? (`cache-correctness.ts`)
+Every worker explicitly receives `EXTRA_CONSTRAINT=0`. The harness independently
+compares the o1js verification-key Field hash, method digest, row count, and a
+separately labelled SHA-256 fingerprint of `verificationKey.data`.
 
-The worst failure mode this tool could have. If a warm cache returned a key that
-no longer matched the source, `check` would pass on a circuit that really
-changed — silently, which is far worse than a crash.
+The installed o1js implementation defaults an omitted compile cache to
+`Cache.FileSystemDefault`; omission therefore does **not** mean “no cache.” This
+experiment passes explicit `Cache.FileSystem(...)` objects. o1js also supports
+`Cache.None` for a genuinely uncached case, but that is not one of these four
+comparisons. In the installed implementation, `forceRecompile` bypasses cached
+prover-key reads while compilation still receives the configured cache.
 
-Three compiles against **one shared cache**, changing the circuit by exactly one
-constraint in between:
+## Cache mutation and cold controls
 
-| run | rows | verification key hash |
-| --- | ---: | --- |
-| original, cold cache | 615 | `2409148662…2417` |
-| one extra constraint, same warm cache | 616 | `1238812145…5290` |
-| original restored, same cache | 615 | `2409148662…2417` |
+`cache-correctness.ts` runs these cases sequentially:
 
-**The cache is safe.** The changed circuit produced a different key, and
-restoring the source restored the original key.
+| Case | Circuit | Cache |
+| --- | --- | --- |
+| A | original | initially empty shared cache |
+| B | added constraint | shared cache after A |
+| C | added constraint | independent empty cache |
+| D | original restored | shared cache after B |
+| E | original | another independent empty cache |
 
-This is not luck. o1js's `Cache.FileSystem` is content-addressed: each entry's
-`.header` holds a `uniqueId` derived from the circuit hash, and a read whose
-`uniqueId` does not match is treated as a miss.
+The changed fixture must add exactly one row and change both its method digest
+and verification-key Field hash. B and C must agree on every measurement; D and
+E must each agree with A. Thus the success statement is deliberately bounded:
+**no stale-key mismatch was observed for this mutation under the recorded
+configuration.**
 
-### Why this matters for the tool's design
+Filesystem cache lookup uses a stable `persistentId` to choose the file and
+validates the requested `uniqueId` against its header before reading data. In
+the inspected o1js version, prover-key header construction obtains the
+identifying component from a Pickles identifying hash. It should not be
+described as merely the method circuit digest. Likewise, absence of an explicit
+npm version string in an identifier does not by itself demonstrate unsafe
+cross-version reuse.
 
-A naive implementation would pass `forceRecompile: true` on every check to be
-safe, paying roughly 6x (16.2s vs 2.5s above) on every CI run. This experiment
-shows that cost is unnecessary, so vk-guard keeps the cache.
+Identical source text is not sufficient for identical compilation output when
+environment-dependent circuit construction (such as this fixture's switch) or
+compile options differ. Cross-version and cross-backend behavior is outside
+these experiments unless those combinations are run and compared separately.
+vk-guard's version-separated production cache directories are a conservative
+policy, not proof of complete cache isolation.
 
-One gap remains, and the tool closes it by construction: that `uniqueId` does
-**not** encode the o1js version, so an upgrade that changed key derivation
-without changing the circuit hash could in principle reuse an artifact across
-versions. vk-guard namespaces its cache directory by o1js version
-(`.vk-guard-cache/o1js-<version>/`), which makes that unreachable.
+## Reproducibility record
 
-## Notes
+Each JSON file includes its schema version; vk-guard version and Git commit;
+resolved o1js, Node, OS, and architecture; requested/effective backend fields;
+compilation options and fixture variant; fixture/build-input and lockfile
+SHA-256 fingerprints; elapsed time and measurements per case; every assertion;
+overall status; and structured errors and diagnostics on failure. The harness
+does not collect arbitrary environment variables, credentials, host names, or
+other machine identifiers.
 
-- Both scripts compile a deliberately tiny contract. The questions are about
-  o1js's behaviour, not circuit complexity, and a small circuit keeps each run
-  to seconds rather than minutes.
-- Timings come from this container and will differ on your hardware. The
-  **equality** of the hashes is the result; the seconds are context.
+## Historical measurements
+
+Earlier repository documentation recorded 615 rows for the original fixture,
+616 for its one-constraint mutation, and materially faster warm-cache timings.
+Those timings were historical observations from their particular container,
+not current benchmarks or guarantees. Inspect the checked-in JSON results for
+the measurements actually obtained by the current harness.
+
+Synthetic tests in `test/experiments-harness.test.ts` exercise harness success
+and failure handling without claiming anything about compiler behavior. They
+remain distinct from the real o1js integration experiments.

@@ -13,17 +13,11 @@ export type MeasureOptions = {
 /**
  * Default compile cache location, namespaced by o1js version.
  *
- * o1js's FileSystem cache is content-addressed: each entry's `.header` holds a
- * uniqueId built from the circuit hash, and a read that does not match the
- * requested uniqueId is a miss (see o1js cache.ts). We verified empirically
- * that editing a method and recompiling against the same warm cache yields a
- * DIFFERENT verification key, so the cache cannot produce a false pass within a
- * given o1js version, and `forceRecompile` is not needed for correctness.
- *
- * That uniqueId does not encode the o1js version, however. Segregating the
- * cache by version removes the one remaining way a stale artifact could be
- * reused — an o1js upgrade that changes key derivation without changing the
- * circuit hash — while keeping the large speedup of a warm cache.
+ * o1js's FileSystem cache selects an entry by persistentId and validates its
+ * uniqueId header before reading. Our fixture experiment compares a mutation in
+ * warm and independent cold caches; passing is bounded evidence for that case,
+ * not a universal cache guarantee. Version segregation is a conservative
+ * additional boundary while retaining the warm-cache speedup.
  */
 export function defaultCacheDir(root: string, o1jsVersion: string): string {
   return join(root, '.vk-guard-cache', `o1js-${o1jsVersion}`);
