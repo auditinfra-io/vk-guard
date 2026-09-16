@@ -221,9 +221,10 @@ want large proving-time regressions surfaced.
 A stale cache that produced a matching verification key would be a false pass — the worst
 failure mode this tool could have. We investigated rather than assumed.
 
-o1js's `Cache.FileSystem` is **content-addressed on the circuit**: each entry's `.header`
-holds a `uniqueId` built from the circuit hash, and a read whose `uniqueId` does not match
-is treated as a miss. Verified empirically against o1js 3.0.0:
+o1js's filesystem cache chooses an entry using `persistentId` and checks the requested
+`uniqueId` against the entry's `.header` before reading it. Current upstream header
+construction uses a Pickles identifying hash; it should not be assumed to be merely the
+method digest. The following are historical observations against o1js 3.0.0:
 
 | Run | Source | Cache | Verification key hash | `increment` rows |
 | --- | --- | --- | --- | --- |
@@ -231,14 +232,17 @@ is treated as a miss. Verified empirically against o1js 3.0.0:
 | 2 | one extra constraint | **same warm cache** | `22280710…3583` (differs) | 616 |
 | 3 | original restored | same warm cache | `39730952…9048` (matches run 1) | 615 |
 
-The warm cache did not serve a stale key, and the round trip was stable. So
-`forceRecompile` is **not** required for correctness, and vk-guard uses the cache — a
-warm run took 5s against 27s cold in that experiment.
+For this fixture and configuration, the warm cache did not produce a stale-key mismatch,
+and the round trip was stable. The 5s warm and 27s cold measurements are historical.
 
-That `uniqueId` does not encode the o1js version, though. So vk-guard namespaces its cache
-directory by o1js version (`.vk-guard-cache/o1js-<version>/`), which removes the one
-remaining way a stale artifact could be reused — an o1js upgrade that changed key
-derivation without changing the circuit hash — while keeping the speedup.
+vk-guard conservatively namespaces its cache directory by o1js version
+(`.vk-guard-cache/o1js-<version>/`). Lack of an explicit npm version in an identifier does
+not demonstrate unsafe cross-version reuse, and version separation is not proof of complete
+isolation. Cross-version and cross-backend guarantees remain outside this experiment.
+
+Identical source is also insufficient when environment-dependent circuit construction or
+compile options differ. The strengthened experiment records those inputs and directly
+compares warm and independent cold compilation of the same changed circuit.
 
 **Determinism was verified before anything was built on it**, and both claims above
 are reproducible rather than asserted:

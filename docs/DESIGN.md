@@ -79,21 +79,25 @@ Relatedly, `require.resolve('o1js/package.json')` fails outright: the `exports`
 map does not list that subpath. The version is read by walking up from the
 resolved entry point.
 
-### The compile cache is content-addressed, so it cannot cause a false pass
+### Compile-cache policy and measured evidence
 
-`Cache.FileSystem` stores each entry beside a `.header` holding a `uniqueId`
-derived from the circuit hash, and `readCache` treats a mismatched `uniqueId` as
-a miss. Measured in [`experiments/cache-correctness.ts`](../experiments/README.md):
-changing one constraint and recompiling against the same warm cache produces a
-different verification key, and restoring the source restores the original key.
+`Cache.FileSystem` selects files by `persistentId` and validates the requested
+`uniqueId` against the adjacent header. Current upstream header construction
+uses a Pickles identifying hash, not necessarily the method digest. Measured in
+[`experiments/cache-correctness.ts`](../experiments/README.md): changing one
+constraint is compared in both a warm cache and an independent cold cache, then
+the original is restored and compared with another cold control.
 
-So `forceRecompile` is unnecessary, and vk-guard keeps the cache — worth roughly
-6x on a warm run.
+Passing means only that no stale-key mismatch was observed for that mutation and
+recorded configuration. Historical measurements found a substantial warm-cache
+speedup; they are not a performance guarantee.
 
-That `uniqueId` does not encode the o1js version, which leaves one theoretical
-gap: an upgrade that changed key derivation without changing the circuit hash
-could reuse an artifact across versions. vk-guard namespaces its cache directory
-by o1js version (`.vk-guard-cache/o1js-<version>/`), making that unreachable.
+vk-guard namespaces its cache directory by o1js version
+(`.vk-guard-cache/o1js-<version>/`) as a conservative policy. An identifier's
+lack of an explicit npm version does not prove unsafe reuse, and namespacing is
+not proof of complete isolation. Cross-version and cross-backend behavior must
+be tested separately. Identical source is insufficient if environment-dependent
+circuit construction or compilation options differ.
 
 ## Design decisions
 
