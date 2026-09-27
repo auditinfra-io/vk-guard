@@ -14,7 +14,7 @@ repeatedly — group operation changes, a VK-hash fix, and a `Provable.if()` rew
 
 o1Labs runs verification-key regression tests for o1js itself
 ([`tests/vk-regression/`](https://github.com/o1-labs/o1js/tree/main/tests/vk-regression)).
-App developers have had nothing equivalent for their own projects.
+vk-guard brings verification-key regression checks into application CI.
 
 vk-guard snapshots your contracts' verification key hashes and per-method constraint
 counts into a committed file, and fails CI when they drift.
