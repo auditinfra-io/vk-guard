@@ -19,7 +19,7 @@ currently deployed.
 
 o1Labs runs verification-key regression tests for o1js itself, in
 [`tests/vk-regression/`](https://github.com/o1-labs/o1js/tree/main/tests/vk-regression).
-Application developers had nothing equivalent. vk-guard is that, for your project.
+vk-guard brings verification-key regression checks into application CI.
 
 ## Findings about o1js
 
