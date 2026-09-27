@@ -19,6 +19,10 @@ App developers have had nothing equivalent for their own projects.
 vk-guard snapshots your contracts' verification key hashes and per-method constraint
 counts into a committed file, and fails CI when they drift.
 
+See also: [o1js-scan](https://github.com/auditinfra-io/o1js-scan) (o1js / Noir
+soundness linting), [gnark-safety](https://github.com/auditinfra-io/gnark-safety)
+(gnark circuits).
+
 ```
 $ vk-guard check
 
