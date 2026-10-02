@@ -17,13 +17,13 @@ export type Discovered = {
 };
 
 /**
- * The shape vk-guard actually depends on. Verified against o1js 3.0.0: both
+ * The shape vk-guard actually depends on. Verified against o1js 3.0.0 and 3.1.0: both
  * `SmartContract` (static members) and the object returned by `ZkProgram()`
  * expose these, though their `compile()` option bags differ slightly.
  */
 /**
  * What o1js reports per method. `gates` is the constraint system itself —
- * verified against o1js 3.0.0, each gate carries its type, the 7-cell wire
+ * verified against o1js 3.0.0 and 3.1.0, each gate carries its type, the 7-cell wire
  * permutation, and its coefficients. It is large (hundreds of entries per
  * method), so it is read for `explain` and never written to a snapshot.
  */

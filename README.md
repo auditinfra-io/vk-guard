@@ -26,12 +26,12 @@ soundness linting), [gnark-safety](https://github.com/auditinfra-io/gnark-safety
 ```
 $ vk-guard check
 
-1 of 2 compared verification keys changed (1 unchanged).
-o1js version unchanged (3.0.0).
+1 of 1 compared verification key changed.
+o1js version unchanged (3.1.0).
 Method circuit digests also changed.
 This comparison does not determine the cause.
 
-  Counter   vk 1760987873…1876 -> 2227773096…5608  (SmartContract)
+  Counter   vk 1760987873…1876 -> 1340037853…9289  (SmartContract)
 
 If an account still holds a previous key, proofs from the changed circuit will
 not verify against it. Applying the change may require an authorized
@@ -42,11 +42,16 @@ change any key on-chain. See README, "What a verification key change means".
 
 Circuit changed (method digest differs) in:
   Counter.increment()
+This is the constraint-level evidence behind the key differences above.
+
+Gate types that moved:
+  Counter.increment()
+    Generic          15 -> 16     (+1)
 
 Constraint count changed:
   Counter.increment()   615 -> 616 rows (+1)
 
-1 contract, 2 methods, o1js 3.0.0
+1 contract, 2 methods, o1js 3.1.0
 ```
 
 ## Install
@@ -94,7 +99,9 @@ so those are JSON too:
   "ok": false,
   "reason": "no-snapshot",
   "error": "no snapshot at /repo/.vk-guard.json\n\nRun `vk-guard update` to record …",
-  "summary": "2 contracts, 5 methods, o1js 3.0.0"
+  "summary": "1 contract, 2 methods, o1js 3.1.0",
+  "snapshot": "/repo/.vk-guard.json",
+  "typeErrorCount": 0
 }
 ```
 
@@ -169,8 +176,8 @@ false confidence. So:
 
 ```json
 {
-  "vkGuardVersion": "0.1.0",
-  "o1jsVersion": "3.0.0",
+  "vkGuardVersion": "0.4.2",
+  "o1jsVersion": "3.1.0",
   "contracts": {
     "Counter": {
       "file": "src/Counter.ts",
@@ -178,8 +185,24 @@ false confidence. So:
       "verificationKeyHash": "17609878734510172312999390341520149576174096919885406581548138984158042861876",
       "digest": "28b21ef82c11eac43caef828304800537ba7ebde5fa2f699de224531db17e008",
       "methods": {
-        "increment": { "rows": 615, "digest": "b36e671c87cf5043980baa22bb2daaec" },
-        "reset": { "rows": 626, "digest": "94b89320f7403f9d8df1c0f8165e76c4" }
+        "increment": {
+          "rows": 615,
+          "digest": "b36e671c87cf5043980baa22bb2daaec",
+          "gateTypes": {
+            "Poseidon": 550,
+            "Zero": 50,
+            "Generic": 15
+          }
+        },
+        "reset": {
+          "rows": 626,
+          "digest": "94b89320f7403f9d8df1c0f8165e76c4",
+          "gateTypes": {
+            "Poseidon": 561,
+            "Zero": 51,
+            "Generic": 14
+          }
+        }
       }
     }
   }
@@ -285,7 +308,7 @@ vk-guard defaults these on if your config is silent about them.
 
 ### o1js versions
 
-Developed and verified against **o1js 3.0.0**. The peer range is `>=3.0.0 <4.0.0`.
+Verified against **o1js 3.0.0 and 3.1.0**. The peer range is `>=3.0.0 <4.0.0`.
 Major o1js releases can change the compiler API, so they are enabled only after explicit
 compatibility testing rather than being assumed compatible.
 

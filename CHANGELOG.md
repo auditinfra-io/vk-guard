@@ -5,6 +5,19 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Changed
+
+- The README's example output, `--json` example and snapshot-format example are regenerated
+  from real runs under o1js 3.1.0, replacing 3.0.0 captures. The previous drift example
+  reported "1 of 2 compared verification keys" over a one-contract project, which no single
+  run produces; the new one is verbatim. `Counter`'s verification key is identical under
+  both versions, which is itself a small piece of evidence that 3.1.0 left contracts without
+  nested `@method` calls alone.
+- Compatibility now reads "verified against o1js 3.0.0 and 3.1.0". The peer range is
+  unchanged (`>=3.0.0 <4.0.0`).
+- The `o1js` dev dependency is `^3.1.0`. The dogfood example's baseline is recorded under
+  3.1.0, so a development install resolving 3.0.0 would fail its own self-check.
+
 ## [0.4.2] - 2026-10-02
 
 Ships the 0.4.1 changes below, which never reached npm.
