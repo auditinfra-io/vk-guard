@@ -5,6 +5,8 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-02
+
 ### Added
 
 - `examples/counter` now includes a nested `@method` call (`Caller` calling `Callee`). o1js
@@ -285,7 +287,9 @@ First release.
 - Supports Node.js 20 and newer. `@types/node` and vitest are pinned to versions that
   support that floor, so the support claim is actually tested.
 
-[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/auditinfra-io/vk-guard/releases/tag/v0.1.0
