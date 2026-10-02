@@ -80,10 +80,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       # Trusted Publishing needs npm >= 11.5.1; setup-node still ships npm 10.
+      #
+      # Pinned, not @latest. The 0.4.1 release failed here when @latest became
+      # npm 12, whose `npm ci` rejects a lockfile npm 10 accepts -- and CI, on
+      # setup-node's npm 10, had passed the same commit. CI's Node 22 leg
+      # installs this same version so the two cannot drift apart again;
+      # test/workflows.test.ts fails if the pins disagree. npm 12 requires
+      # Node >= 22.22.2, which is why only the Node 22 leg can mirror it.
       - name: Ensure npm supports Trusted Publishing
         run: |
           set -euo pipefail
-          npm install --global npm@latest
+          npm install --global npm@12.2.0
           npm --version
 
       - run: npm ci

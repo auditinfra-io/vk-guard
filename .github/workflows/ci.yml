@@ -20,6 +20,18 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      # Run the release workflow's exact npm on the Node 22 leg, so a lockfile
+      # or install problem that only the release's npm sees fails here first
+      # instead of at publish time. Must match release.yml (checked by
+      # test/workflows.test.ts). npm 12 needs Node >= 22.22.2, so the Node 20
+      # leg keeps setup-node's npm.
+      - name: Use the release workflow's npm
+        if: matrix.node == '22'
+        run: |
+          set -euo pipefail
+          npm install --global npm@12.2.0
+          npm --version
+
       - run: npm ci
       - run: npm run format:check
       - run: npm run typecheck

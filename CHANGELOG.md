@@ -5,7 +5,26 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-02
+
+Ships the 0.4.1 changes below, which never reached npm.
+
+### Fixed
+
+- The release workflow could not install dependencies, so 0.4.1 was tagged on GitHub but
+  never published. The lockfile Dependabot wrote when bumping o1js to 3.1.0 recorded
+  o1js's optional `@o1js/native` dependency without resolving it. npm 10 tolerates that;
+  npm 12 rejects it as out of sync. CI ran setup-node's npm 10 and passed the same commit,
+  while the release workflow installed `npm@latest`, which had become npm 12. The lockfile
+  now resolves `@o1js/native` and its four platform packages. With those installed, all
+  tests pass and the dogfood example's committed keys are unchanged.
+- The release workflow pins npm to an exact version instead of `@latest`, CI's Node 22 leg
+  installs that same version before `npm ci`, and a test fails if the two pins disagree.
+  An install problem that only the release's npm would hit now fails in CI first.
+
 ## [0.4.1] - 2026-10-02
+
+Tagged but not published to npm: the release workflow failed before publishing (see 0.4.2).
 
 ### Added
 
@@ -287,7 +306,8 @@ First release.
 - Supports Node.js 20 and newer. `@types/node` and vitest are pinned to versions that
   support that floor, so the support claim is actually tested.
 
-[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.2.0...v0.3.0
