@@ -176,7 +176,7 @@ false confidence. So:
 
 ```json
 {
-  "vkGuardVersion": "0.4.2",
+  "vkGuardVersion": "0.4.3",
   "o1jsVersion": "3.1.0",
   "contracts": {
     "Counter": {

@@ -5,6 +5,8 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-02
+
 ### Changed
 
 - The README's example output, `--json` example and snapshot-format example are regenerated
@@ -319,7 +321,8 @@ First release.
 - Supports Node.js 20 and newer. `@types/node` and vitest are pinned to versions that
   support that floor, so the support claim is actually tested.
 
-[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/auditinfra-io/vk-guard/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/auditinfra-io/vk-guard/compare/v0.3.0...v0.4.0

@@ -1,6 +1,6 @@
 {
   "name": "vk-guard",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Verification-key and constraint-count regression guard for o1js zkApps. Fails CI when a circuit's verification key or constraint counts drift from a committed baseline.",
   "keywords": [
     "o1js",
