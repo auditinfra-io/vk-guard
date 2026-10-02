@@ -5,6 +5,24 @@ All notable changes to this project will be documented here. This project follow
 
 ## [Unreleased]
 
+### Added
+
+- `examples/counter` now includes a nested `@method` call (`Caller` calling `Callee`). o1js
+  3.1.0 changed how a caller witnesses the callee's account update, which changes the
+  caller's verification key — and the dogfood example, which had no nested call, reported
+  no drift across that upgrade. Measured against 3.0.0, `Caller.callAdd()` moves from 1399
+  to 1548 rows and `Callee` is untouched; with the new baseline, CI fails if that path
+  moves again. Existing `Counter` and `HashChain` entries are unchanged in the snapshot.
+
+### Changed
+
+- A clean `check` across an o1js version change now says so: `No drift.` is followed by
+  `o1js version changed: A -> B. Nothing this check compares moved.` Previously the CLI only
+  reported the version on drift, so the most reassuring result of an upgrade — nothing
+  moved — was indistinguishable from a run where the version never changed. The Action's
+  job summary already stated the version on every run; the JSON output is unchanged.
+- The example baseline is now recorded under o1js 3.1.0.
+
 ## [0.4.0] - 2026-09-16
 
 ### Added

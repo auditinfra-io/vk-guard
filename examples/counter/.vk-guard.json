@@ -1,7 +1,42 @@
 {
-  "vkGuardVersion": "0.1.0",
-  "o1jsVersion": "3.0.0",
+  "vkGuardVersion": "0.4.0",
+  "o1jsVersion": "3.1.0",
   "contracts": {
+    "Callee": {
+      "file": "src/Nested.ts",
+      "kind": "SmartContract",
+      "verificationKeyHash": "28583297592389087549929519244137712560388219376237158347667588027174558422506",
+      "digest": "3f5422a3b25084699b6b25e25215d00d347d9ae5e05565a74c38d735565e28a7",
+      "methods": {
+        "add": {
+          "rows": 616,
+          "digest": "759069e8b2453d579793ee0cfc8e25b2",
+          "gateTypes": {
+            "Poseidon": 550,
+            "Zero": 50,
+            "Generic": 16
+          }
+        }
+      }
+    },
+    "Caller": {
+      "file": "src/Nested.ts",
+      "kind": "SmartContract",
+      "verificationKeyHash": "25111535252881034700433282729782990527471541541145365954957002766521961170980",
+      "digest": "1a56068f780ec1c6b06fc3ff2f73713843c08def8e5f1a3509ffd21c3f7cfc57",
+      "methods": {
+        "callAdd": {
+          "rows": 1548,
+          "digest": "62ea7db509f5b152f82507f9afd73085",
+          "gateTypes": {
+            "Poseidon": 1133,
+            "Generic": 230,
+            "Zero": 103,
+            "EndoMulScalar": 82
+          }
+        }
+      }
+    },
     "Counter": {
       "file": "src/Counter.ts",
       "kind": "SmartContract",

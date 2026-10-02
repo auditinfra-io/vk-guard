@@ -23,7 +23,8 @@ vk-guard also checks itself:
 npm run example:check
 ```
 
-`examples/counter` is a real zkApp — one `SmartContract` and one `ZkProgram` — whose
+`examples/counter` is a real zkApp — a `SmartContract`, a `ZkProgram`, and a caller/callee
+pair making a nested `@method` call — whose
 verification keys and row counts are committed in `examples/counter/.vk-guard.json`, and
 CI runs this check on every pull request. If you change how circuits are measured, or
 bump o1js, this is what will notice. When the change is intended, regenerate the baseline

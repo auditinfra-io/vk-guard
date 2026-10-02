@@ -34,9 +34,11 @@ jobs:
           test -f dist/index.js
 
       # vk-guard guards itself. examples/counter holds a real zkApp (a
-      # SmartContract and a ZkProgram) with its verification keys and row
-      # counts committed alongside it. If an o1js upgrade or a change in this
-      # repo moves either, this step is what says so.
+      # SmartContract, a ZkProgram, and a nested @method call) with its
+      # verification keys and row counts committed alongside it. If an o1js
+      # upgrade or a change in this repo moves any of them, this step is what
+      # says so. The nested call is there because o1js 3.1.0 changed exactly
+      # that path and the example without it stayed green.
       - name: Dogfood - check the example project
         run: npm run example:check
         timeout-minutes: 15

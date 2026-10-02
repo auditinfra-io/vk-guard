@@ -391,11 +391,18 @@ there is no witness inspection here either.
 
 ## vk-guard guards itself
 
-[`examples/counter`](examples/counter) is a small but real zkApp — a `SmartContract` and a
-`ZkProgram` — with its verification keys and per-method row counts committed alongside it
-in `examples/counter/.vk-guard.json`. CI runs `vk-guard check` against it on every pull
+[`examples/counter`](examples/counter) is a small but real zkApp — a `SmartContract`, a
+`ZkProgram`, and a pair of contracts where one calls the other's `@method` — with its
+verification keys and per-method row counts committed alongside it in
+`examples/counter/.vk-guard.json`. CI runs `vk-guard check` against it on every pull
 request, so the tool is exercised end to end against real compiled circuits, and an o1js
-upgrade announces itself here first.
+upgrade that changes any of those circuit shapes announces itself here first.
+
+The nested call was added after o1js 3.1.0. That release changed how a caller witnesses
+the callee's account update, which changes the caller's verification key — and the
+example as it stood, with no nested call, reported no drift. Against the 3.0.0 baseline
+the new `Caller.callAdd()` goes from 1399 to 1548 rows; `Callee` does not move. An example
+only guards the circuit shapes it contains.
 
 ```bash
 npm run example:check

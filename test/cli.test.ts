@@ -33,6 +33,37 @@ describe('baseline and unchanged check', () => {
   });
 });
 
+// An o1js upgrade that changes nothing must still be reported as an upgrade.
+describe('unchanged check across an o1js version change', () => {
+  it('says the o1js version changed even when nothing drifted', () => {
+    const dir = makeProject('version-only', { 'src/Counter.ts': COUNTER });
+    expect(runCli(dir, ['update']).code).toBe(0);
+
+    // Pretend the baseline was taken under an older o1js. The keys and counts
+    // are untouched, so this is exactly the o1js 3.0.0 -> 3.1.0 situation for a
+    // contract the release did not affect.
+    const snap = readSnap(dir);
+    const current = snap.o1jsVersion;
+    snap.o1jsVersion = '0.0.1';
+    writeFileSync(join(dir, '.vk-guard.json'), JSON.stringify(snap, null, 2) + '\n');
+
+    const check = runCli(dir, ['check']);
+    expect(check.code, check.all).toBe(0);
+    expect(check.stdout).toContain('No drift');
+    expect(check.stdout).toContain(`o1js version changed: 0.0.1 -> ${current}.`);
+    // A comparison cannot attribute anything to the version change.
+    expect(check.stdout).not.toMatch(/caused|explains/i);
+  });
+
+  it('stays terse when the o1js version did not change', () => {
+    const dir = makeProject('version-same', { 'src/Counter.ts': COUNTER });
+    expect(runCli(dir, ['update']).code).toBe(0);
+    const check = runCli(dir, ['check']);
+    expect(check.code, check.all).toBe(0);
+    expect(check.stdout).not.toContain('o1js version changed');
+  });
+});
+
 // Case 2
 describe('a changed method body', () => {
   it('fails and reports verification key drift', () => {

@@ -213,9 +213,17 @@ export async function run(opts: RunOptions): Promise<RunResult> {
     };
   }
 
+  // An o1js upgrade that moves nothing is the most useful clean result vk-guard
+  // can report, so say so rather than letting the summary's version stand
+  // alone. The Action's job summary already states the version on every run;
+  // this brings the CLI in line. Unchanged-version runs stay terse.
+  const noDrift = comparison.o1jsChanged
+    ? `No drift.\no1js version changed: ${comparison.o1jsBefore} -> ${comparison.o1jsAfter}. ` +
+      `Nothing this check compares moved.`
+    : `No drift.`;
   const output = comparison.failed
     ? `${body}\n\n${summary}${warnings}`
-    : `No drift.\n${summary}${warnings}`;
+    : `${noDrift}\n${summary}${warnings}`;
 
   return { exitCode: comparison.failed ? 1 : 0, summary, comparison, measured, output };
 }
